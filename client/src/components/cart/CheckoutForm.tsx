@@ -67,8 +67,17 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     if (!formData.nom || !formData.email || !formData.adresse || !formData.ville || !formData.telephone) {
       setErrorLocal('Veuillez remplir tous les champs obligatoires.');
+      setIsSubmitting(false);
       return;
     }
+
+    const phoneRegex = /^(?:\+216\s?)?[24579]\d{7}$/;
+    if (!phoneRegex.test(formData.telephone.trim())) {
+      setErrorLocal('Veuillez entrer un numéro de téléphone tunisien valide (ex: 27 131 431 ou +216 27 131 431).');
+      setIsSubmitting(false);
+      return;
+    }
+
     setErrorLocal(null);
 
     // Enrich InitiateCheckout with user data right before proceeding
@@ -221,6 +230,8 @@ const handleSubmit = async (e: React.FormEvent) => {
             value={formData.telephone}
             onChange={handleChange}
             required
+            pattern="^(?:\+216\s?)?[24579]\d{7}$"
+            title="Veuillez entrer un numéro de téléphone tunisien valide (ex: 27 131 431 ou +216 27 131 431)."
           />
         </div>
 

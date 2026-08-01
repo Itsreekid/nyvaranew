@@ -34,7 +34,7 @@ function ShopContent() {
   const initialMinPrice = searchParams.has('min_price') ? Number(searchParams.get('min_price')) : undefined;
   const initialMaxPrice = searchParams.has('max_price') ? Number(searchParams.get('max_price')) : undefined;
   const urlCategorySlug = searchParams.get('category');
-  const initialSort = (searchParams.get('sort') as SortOption) ?? 'tendance';
+  const initialSort = (searchParams.get('sort') as SortOption) ?? 'newest';
 
   const [filters, setFilters] = useState<ProductFilters & { page?: number; pageSize?: number }>({
     gender: initialGender,
@@ -97,7 +97,7 @@ function ShopContent() {
 
   const handleReset = useCallback(() => {
     updateFilters({ gender: 'all', page: 0, pageSize: 20 });
-    updateSort('tendance');
+    updateSort('newest');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, pathname, categories, router]);
 
