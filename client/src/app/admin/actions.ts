@@ -89,3 +89,14 @@ export async function removeEmployeeAction(id: string) {
   if (error) return { error: 'Erreur lors de la suppression.' };
   return { success: true };
 }
+
+// ── Remove Product Image ──────────────────────────────────────────────────
+export async function deleteProductImageAction(id: string) {
+  const { error } = await supabaseAdmin
+    .from('product_images')
+    .delete()
+    .eq('id', id);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}

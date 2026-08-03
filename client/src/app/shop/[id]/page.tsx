@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import ProductDetail from './ProductDetail';
 import type { Product } from '@/types';
 
+export const revalidate = 0;
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!

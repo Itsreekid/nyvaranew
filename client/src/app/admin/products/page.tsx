@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import ImageUpload from '@/components/admin/ImageUpload';
 import { PlusCircle, Trash2, ImageIcon, Loader2 } from 'lucide-react';
+import { deleteProductImageAction } from '../actions';
 import adminStyles from '../admin.module.css';
 import styles from './products.module.css';
 
@@ -218,8 +219,28 @@ export default function AdminProductsPage() {
   };
 
   const handleGalleryDelete = async (id: string) => {
-    await supabase.from('product_images').delete().eq('id', id);
+    const imgToDelete = galleryImages.find(img => img.id === id);
+    
+    // Call server action to bypass RLS
+    const res = await deleteProductImageAction(id);
+    if (res.error) {
+      alert('Erreur lors de la suppression en base de données: ' + res.error);
+      return;
+    }
+
     setGalleryImages(prev => prev.filter(img => img.id !== id));
+
+    if (imgToDelete?.image_url) {
+      try {
+        await fetch('/api/delete-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: imgToDelete.image_url }),
+        });
+      } catch (err) {
+        console.error('Failed to delete image from R2:', err);
+      }
+    }
   };
 
   const margin = (p: Product) => {
