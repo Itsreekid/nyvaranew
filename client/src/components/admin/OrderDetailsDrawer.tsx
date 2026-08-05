@@ -79,7 +79,7 @@ export default function OrderDetailsDrawer({
       setHistoryLoading(true);
       supabase
         .from('orders')
-        .select('id, created_at, total_price, call_status, order_items(quantity, quantity_break_price, selected_color_name, products(id, title, price, discount, image_url))')
+        .select('id, created_at, total_price, call_status, order_items(quantity, quantity_break_price, selected_color_name, selected_color_hex1, selected_color_hex2, products(id, title, price, discount, image_url))')
         .eq('phone', order.phone)
         .neq('id', order.id)
         .order('created_at', { ascending: false })
@@ -537,9 +537,8 @@ export default function OrderDetailsDrawer({
                             </div>
                           );
                         })() : (() => {
-                          const co   = findColor(item);
-                          const hex1 = co?.hex1 || item.selected_color_hex1;
-                          const hex2 = co?.hex2 || item.selected_color_hex2;
+                          const hex1 = item.selected_color_hex1;
+                          const hex2 = item.selected_color_hex2;
                           const name = item.selected_color_name;
                           if (!hex1 && !name) return <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>;
                           return (
