@@ -67,12 +67,12 @@ export default function OrderDetailsDrawer({
       setActiveTab('summary');
       setHistoryOrders([]);
       setExpandedHistoryId(null);
-    } else if (isOpen && mode === 'create' && products.length === 0) {
+    } else if (isOpen && (mode === 'create' || isEditing) && products.length === 0) {
       supabase.from('products').select('id, title, price, discount, image_url, color_options').order('title').then(({ data }) => {
         if (data) setProducts(data);
       });
     }
-  }, [isOpen, mode, products.length]);
+  }, [isOpen, mode, isEditing, products.length]);
 
   React.useEffect(() => {
     if (activeTab === 'history' && order?.phone) {
