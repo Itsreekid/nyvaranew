@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 /**
  * GET /api/products
@@ -9,6 +11,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
+    headers(); // FORCE DYNAMIC RENDERING
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const category_id = searchParams.get("category_id");
