@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = request.nextUrl;
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
     const category_id = searchParams.get("category_id");
     const gender = searchParams.get("gender");
     const search = searchParams.get("search");
