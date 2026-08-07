@@ -16,11 +16,13 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
   const [error, setError]           = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
+  // Derive stable primitive values for the dependency array
+  const pageSize = (filters as any)?.pageSize ?? 20;
+  const page     = (filters as any)?.page     ?? 0;
+
   const fetchProducts = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const pageSize = (filters as any)?.pageSize || 100;
-      const page     = (filters as any)?.page || 0;
       const params = new URLSearchParams();
       if (filters?.category_id) params.set('category_id', filters.category_id);
       if (filters?.gender && filters.gender !== 'all') params.set('gender', filters.gender);
@@ -30,8 +32,9 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
       if (sort) params.set('sort', sort);
       params.set('page', String(page));
       params.set('pageSize', String(pageSize));
+      params.set('_t', String(Date.now())); // bust any CDN / browser cache
 
-      const res  = await fetch(`/api/products?${params}`);
+      const res  = await fetch(`/api/products?${params}`, { cache: 'no-store' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load products');
 
@@ -40,7 +43,8 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load products');
     } finally { setLoading(false); }
-  }, [filters?.category_id, filters?.gender, filters?.min_price, filters?.max_price, filters?.search, sort, (filters as any)?.page, (filters as any)?.pageSize]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters?.category_id, filters?.gender, filters?.min_price, filters?.max_price, filters?.search, sort, page, pageSize]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
   return { products, loading, error, totalCount, refetch: fetchProducts };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { uploadImageToR2 } from '@/lib/r2-upload';
 import type { Product, Category, ColorOption, QuantityBreak } from '@/types';
@@ -76,21 +76,21 @@ export default function AdminProductsPage() {
   // Quantity Breaks
   const [quantityBreaks, setQuantityBreaks] = useState<QuantityBreak[]>([]);
 
-  const fetchAll = () => {
+  const fetchAll = useCallback(() => {
     setLoading(true);
     const ts = Date.now();
     Promise.all([
-      fetch(`/api/products?sort=newest&page=${page}&pageSize=${pageSize}&_t=${ts}`).then(r => r.json()),
-      fetch(`/api/categories?_t=${ts}`).then(r => r.json()),
+      fetch(`/api/products?sort=newest&page=${page}&pageSize=${pageSize}&_t=${ts}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`/api/categories?_t=${ts}`, { cache: 'no-store' }).then(r => r.json()),
     ]).then(([prodsJson, catsJson]) => {
       if (prodsJson.data) setProducts(prodsJson.data as Product[]);
       if (prodsJson.count !== undefined) setTotalCount(prodsJson.count);
       if (catsJson.data)  setCategories(catsJson.data as Category[]);
       setLoading(false);
     }).catch(() => setLoading(false));
-  };
+  }, [page, pageSize]);
 
-  useEffect(() => { fetchAll(); }, [page, pageSize]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const openAddModal = () => {
     setEditingProduct(null);
