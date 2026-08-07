@@ -50,11 +50,18 @@ const nextConfig: NextConfig = {
           { key: 'X-Robots-Tag', value: 'noindex' },
         ],
       },
-      // Cache API responses for 5 minutes
+      // Products: NEVER cache — pagination and sorting depend on query params
       {
         source: '/api/products',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=300, stale-while-revalidate=600' },
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
+        ],
+      },
+      // Products single item: also no cache
+      {
+        source: '/api/products/:id*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
         ],
       },
       {
