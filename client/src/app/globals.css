@@ -1,6 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Font optimization: Use local fonts instead of remote imports */
 /* Fonts are now loaded via next/font/google in layout.tsx with preload and swap display */
-
 /* ─── Design Tokens ─────────────────────────────────────────── */
 :root {
   --color-cream:      #F7F3ED;

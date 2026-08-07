@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import type { Order } from '@/types';
 import adminStyles from './admin.module.css';
 import styles from './dashboard.module.css';
@@ -58,12 +57,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     // Limit to last 500 orders — fetching all rows with nested joins
     // on every mount is a major CPU/RAM bottleneck.
-    supabase
-      .from('orders')
-      .select(`*, order_items ( quantity, products ( cost_price ) )`)
-      .order('created_at', { ascending: false })
-      .limit(500)
-      .then(({ data }) => {
+    fetch('/api/orders/stats').then(r => r.json()).then(({ data }) => {
         if (data) setOrders(data as OrderWithItems[]);
         setLoading(false);
       });
@@ -73,16 +67,16 @@ export default function AdminDashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const ordersToday  = orders.filter(o => safeDateParse(o.created_at).getTime() >= today.getTime());
-  const revenueToday = ordersToday.reduce((s, o) => s + (o.total_price ?? 0), 0);
+  const revenueToday = ordersToday.reduce((s, o) => s + Number(o.total_price ?? 0), 0);
 
   const deliveredOrders = orders.filter(o => DELIVERED_STATUSES.includes(o.cosmos_status ?? ''));
   const returnedOrders  = orders.filter(o => RETURNED_STATUSES.includes(o.cosmos_status ?? ''));
 
-  const grossRevenue = deliveredOrders.reduce((s, o) => s + (o.total_price ?? 0), 0);
+  const grossRevenue = deliveredOrders.reduce((s, o) => s + Number(o.total_price ?? 0), 0);
 
   const totalCOGS = deliveredOrders.reduce((sum, order) => {
     return sum + (order.order_items ?? []).reduce((s, item) => {
-      return s + (item.products?.cost_price ?? 0) * (item.quantity ?? 1);
+      return s + Number(item.products?.cost_price ?? 0) * Number(item.quantity ?? 1);
     }, 0);
   }, 0);
 
@@ -256,7 +250,7 @@ export default function AdminDashboardPage() {
                   <td>#{order.id.slice(0, 8)}</td>
                   <td>{order.customer_name}</td>
                   <td>{safeFormatDate(order.created_at)}</td>
-                  <td>{order.total_price?.toFixed(3)} TND</td>
+                  <td>{Number(order.total_price || 0).toFixed(3)} TND</td>
                   <td>
                     <span className={`${adminStyles.statusBadge} ${adminStyles.statusPending}`}>
                       {order.cosmos_status || 'En attente'}

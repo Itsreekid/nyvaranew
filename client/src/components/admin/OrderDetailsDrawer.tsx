@@ -1,13 +1,14 @@
 'use client';
-
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { X, Edit, Trash2 } from 'lucide-react';
+import { showAdminError } from '@/lib/admin-error';
+import { showAdminSuccess } from '@/lib/admin-success';
 import styles from './OrderDetailsDrawer.module.css';
 import type { ColorOption } from '@/types';
 import type { OrderWithItems, OrderItem } from '@/app/admin/orders/page';
 import StatusDropdown, { CALL_STATUSES } from './StatusDropdown';
-import { supabase } from '@/lib/supabase';
 
 interface DrawerProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ interface EditableItem extends OrderItem {
 function getUnitPrice(item: OrderItem): number {
   if (item.quantity_break_price != null) return item.quantity_break_price;
   if (item.products?.discount != null && item.products.discount > 0) {
-    return (item.products.price ?? 0) * (1 - item.products.discount / 100);
+    return Math.round((item.products.price ?? 0) * (1 - item.products.discount / 100));
   }
   return item.products?.price ?? 0;
 }
@@ -61,6 +62,9 @@ export default function OrderDetailsDrawer({
   const [historyOrders, setHistoryOrders] = React.useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = React.useState<string | null>(null);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => { setMounted(true); }, []);
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -68,25 +72,20 @@ export default function OrderDetailsDrawer({
       setHistoryOrders([]);
       setExpandedHistoryId(null);
     } else if (isOpen && (mode === 'create' || isEditing) && products.length === 0) {
-      supabase.from('products').select('id, title, price, discount, image_url, color_options').order('title').then(({ data }) => {
-        if (data) setProducts(data);
-      });
+      fetch('/api/products?sort=name_asc&noLimit=true', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(({ data }) => { if (data) setProducts(data); });
     }
   }, [isOpen, mode, isEditing, products.length]);
 
   React.useEffect(() => {
     if (activeTab === 'history' && order?.phone) {
       setHistoryLoading(true);
-      supabase
-        .from('orders')
-        .select('id, created_at, total_price, call_status, order_items(quantity, quantity_break_price, selected_color_name, selected_color_hex1, selected_color_hex2, products(id, title, price, discount, image_url))')
-        .eq('phone', order.phone)
-        .neq('id', order.id)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data) setHistoryOrders(data);
+      fetch('/api/orders?noLimit=true').then(r=>r.json()).then(({data})=>{
+          const filtered = (data||[]).filter((o: any) => o.phone === order.phone && o.id !== order.id);
+          setHistoryOrders(filtered);
           setHistoryLoading(false);
-        });
+        }).catch(()=>setHistoryLoading(false));
     }
   }, [activeTab, order?.phone, order?.id]);
 
@@ -138,7 +137,6 @@ export default function OrderDetailsDrawer({
     patchItem(id, { selected_color_name: name, selected_color_hex1: hex1, selected_color_hex2: hex2 });
 
   const handleDeleteItem = (id: string) => {
-    if (editableItems.length <= 1) { alert('Une commande doit contenir au moins un produit.'); return; }
     if (confirm('Voulez-vous supprimer ce produit de la commande ?'))
       setEditableItems(prev => prev.filter(i => i.id !== id));
   };
@@ -155,24 +153,20 @@ export default function OrderDetailsDrawer({
 
   const handleSave = async () => {
     if (!order) return;
+    if (editableItems.length === 0) {
+      showAdminError('Une commande doit contenir au moins un produit.');
+      return;
+    }
     setIsSaving(true);
     console.group('[OrderDrawer] 💾 handleSave started');
     try {
       const newTotal = editableItems.reduce((s, i) => s + i.custom_price * i.quantity, 0);
 
       if (mode === 'create') {
-        const { data: rawNewOrder, error: createError } = await supabase
-          .from('orders')
-          .insert({
-            ...formData,
-            total_price: newTotal,
-            call_status: order.call_status ?? 'pending',
-            cosmos_status: 'pending',
-          } as never)
-          .select()
-          .single();
-        const newOrder = rawNewOrder as unknown as { id: string };
-        if (createError) throw createError;
+        const createRes = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...formData, total_price: newTotal, call_status: order.call_status ?? 'pending', cosmos_status: 'pending', items: [], is_admin_create: true }) });
+        const createJson = await createRes.json();
+        if (!createRes.ok) throw new Error(createJson.error);
+        const newOrder = createJson.data as { id: string };
 
         if (editableItems.length > 0) {
           const itemsToInsert = editableItems.map(item => ({
@@ -184,66 +178,46 @@ export default function OrderDetailsDrawer({
             selected_color_hex1: item.selected_color_hex1 ?? null,
             selected_color_hex2: item.selected_color_hex2 ?? null,
           }));
-          const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert as never);
-          if (itemsError) throw itemsError;
+          const insertRes = await fetch('/api/order-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(itemsToInsert) });
+          if (!insertRes.ok) { const j = await insertRes.json(); throw new Error(j.error); }
         }
       } else {
         const originalIds = viewItems.map(i => i.id);
         const deletedIds  = originalIds.filter(id => !editableItems.find(i => i.id === id));
         if (deletedIds.length > 0) {
-          const { error } = await supabase.from('order_items').delete().in('id', deletedIds).select();
-          if (error) throw error;
+          const delRes = await fetch('/api/order-items', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: deletedIds }) });
+          if (!delRes.ok) { const j = await delRes.json(); throw new Error(j.error); }
         }
 
         for (const item of editableItems) {
           if (item.id.startsWith('temp_')) {
-            const { error } = await supabase.from('order_items').insert({
-              order_id: order.id,
-              product_id: item.product_id || (item.products as any)?.id,
-              quantity: item.quantity,
-              quantity_break_price: item.custom_price,
-              selected_color_name: item.selected_color_name ?? null,
-              selected_color_hex1: item.selected_color_hex1 ?? null,
-              selected_color_hex2: item.selected_color_hex2 ?? null,
-            } as never);
-            if (error) throw error;
+            const insRes = await fetch('/api/order-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: order.id, product_id: item.product_id || (item.products as any)?.id, quantity: item.quantity, quantity_break_price: item.custom_price, selected_color_name: item.selected_color_name ?? null, selected_color_hex1: item.selected_color_hex1 ?? null, selected_color_hex2: item.selected_color_hex2 ?? null }) });
+            if (!insRes.ok) { const j = await insRes.json(); throw new Error(j.error); }
           } else {
-            const { error } = await supabase
-              .from('order_items')
-              .update({
-                quantity:             item.quantity,
-                quantity_break_price: item.custom_price,
-                selected_color_name:  item.selected_color_name ?? null,
-                selected_color_hex1:  item.selected_color_hex1 ?? null,
-                selected_color_hex2:  item.selected_color_hex2 ?? null,
-              } as never)
-              .eq('id', item.id)
-              .select();
-            if (error) throw error;
+            const updRes = await fetch('/api/order-items', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id, quantity: item.quantity, quantity_break_price: item.custom_price, selected_color_name: item.selected_color_name ?? null, selected_color_hex1: item.selected_color_hex1 ?? null, selected_color_hex2: item.selected_color_hex2 ?? null }) });
+            if (!updRes.ok) { const j = await updRes.json(); throw new Error(j.error); }
           }
         }
 
-        const { error } = await supabase
-          .from('orders')
-          .update({ ...formData, total_price: newTotal } as never)
-          .eq('id', order.id)
-          .select();
-        if (error) throw error;
+        const updateRes = await fetch('/api/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: order.id, ...formData, total_price: newTotal }) });
+        if (!updateRes.ok) { const j = await updateRes.json(); throw new Error(j.error); }
       }
 
+      console.log('✅ Save entirely successful');
       console.groupEnd();
       setIsEditing(false);
       onOrderUpdated?.();
-    } catch (err: unknown) {
+      showAdminSuccess('Commande modifiée avec succès !');
+    } catch (err: any) {
       console.error('❌ Save error:', err);
       console.groupEnd();
-      alert('Erreur lors de la sauvegarde : ' + (err as Error).message);
+      showAdminError('Erreur lors de la sauvegarde : ' + (err as Error).message);
     } finally {
       setIsSaving(false);
     }
   };
 
-  return (
+  const drawerContent = (
     <>
       <div className={`${styles.backdrop} ${isOpen ? styles.backdropOpen : ''}`} onClick={onClose} />
       <div className={`${styles.drawer} ${isOpen ? styles.drawerOpen : ''}`}>
@@ -433,10 +407,10 @@ export default function OrderDetailsDrawer({
                           {imgUrl && (
                             <div className={styles.productImgWrapper}>
                               <Image src={imgUrl} alt={item.products?.title ?? ''} width={40} height={40}
-                                className={styles.productImg} unoptimized />
+                                className={styles.productImg} />
                               <div className={styles.productImgHoverZoom}>
                                 <Image src={imgUrl} alt={item.products?.title ?? ''} width={250} height={250}
-                                  unoptimized style={{ objectFit: 'cover', borderRadius: 8 }} />
+                                  style={{ objectFit: 'cover', borderRadius: 8 }} />
                               </div>
                             </div>
                           )}
@@ -604,11 +578,12 @@ export default function OrderDetailsDrawer({
                         onChange={e => {
                           const p = products.find(x => x.id === e.target.value);
                           if (p) {
+                            const initialPrice = getUnitPrice({ products: p } as unknown as OrderItem);
                             setEditableItems(prev => [...prev, {
                               id: `temp_${Math.random()}`,
                               product_id: p.id,
                               quantity: 1,
-                              custom_price: p.price,
+                              custom_price: initialPrice,
                               products: p,
                             } as unknown as EditableItem]);
                           }
@@ -688,7 +663,7 @@ export default function OrderDetailsDrawer({
                                 </svg>
                               </span>
                             </td>
-                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{h.total_price?.toFixed(3)} TND</td>
+                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{Number(h.total_price || 0).toFixed(3)} TND</td>
                             <td style={{ whiteSpace: 'nowrap', width: '1%' }}>
                               <span style={{ 
                                   padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
@@ -709,7 +684,7 @@ export default function OrderDetailsDrawer({
                                     return (
                                       <div key={idx} style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                                         {item.products?.image_url ? (
-                                          <Image src={item.products.image_url} width={40} height={40} style={{ borderRadius: '6px', objectFit: 'cover' }} alt="" unoptimized />
+                                          <Image src={item.products.image_url} width={40} height={40} style={{ borderRadius: '6px', objectFit: 'cover' }} alt="" />
                                         ) : (
                                           <div style={{ width: 40, height: 40, borderRadius: '6px', background: 'rgba(255,255,255,0.1)' }} />
                                         )}
@@ -744,4 +719,6 @@ export default function OrderDetailsDrawer({
       </div>
     </>
   );
+
+  return mounted ? createPortal(drawerContent, document.body) : null;
 }

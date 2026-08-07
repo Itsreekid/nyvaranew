@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { ShoppingBag, Heart, Search, Menu, X, ArrowRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -10,8 +11,8 @@ import CartDrawer from '@/components/cart/CartDrawer';
 import styles from './Navbar.module.css';
 
 const NAV_LINKS = [
-  { href: '/',      label: 'Accueil' },
-  { href: '/shop',  label: 'Boutique' },
+  { href: '/', label: 'Accueil' },
+  { href: '/shop', label: 'Boutique' },
   { href: '/track', label: 'Suivi' },
 ];
 
@@ -20,10 +21,10 @@ export default function Navbar() {
   const { itemCount } = useCart();
   const { items: wishlistItems } = useWishlist();
 
-  const [scrolled,    setScrolled]    = useState(false);
-  const [menuOpen,    setMenuOpen]    = useState(false);
-  const [cartOpen,    setCartOpen]    = useState(false);
-  const [searchOpen,  setSearchOpen]  = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Detect scroll
@@ -63,8 +64,15 @@ export default function Navbar() {
           </nav>
 
           {/* Center — Logo */}
-          <Link href="/" className={styles.logo} aria-label="Nyvara Home">
-            NYVARA
+          <Link href="/" className={styles.logoWrapper} aria-label="Nyvara Home">
+            <Image
+              src="/logotop-n.png"
+              alt="NYVARA"
+              width={70}
+              height={70}
+              style={{ objectFit: 'contain' }}
+              priority
+            />
           </Link>
 
           {/* Right — Icons */}

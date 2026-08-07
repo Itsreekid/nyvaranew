@@ -20,9 +20,16 @@ interface AdminUser {
 
 const EMPTY_FORM = { username: '', full_name: '', password: '', role: 'employee' as 'admin' | 'employee' };
 
-const safeFormatDate = (d: string | null | undefined): string => {
+const safeFormatDate = (d: string | Date | null | undefined): string => {
   if (!d) return 'Date invalide';
-  const date = new Date(d.replace(' ', 'T'));
+  let date: Date;
+  if (d instanceof Date) {
+    date = d;
+  } else if (typeof d === 'string') {
+    date = new Date(d.replace(' ', 'T'));
+  } else {
+    date = new Date(d);
+  }
   if (isNaN(date.getTime())) return 'Date invalide';
   return date.toLocaleDateString('fr-FR');
 };

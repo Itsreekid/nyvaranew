@@ -77,6 +77,9 @@ export default function TrendingPage() {
   const [sortDir, setSortDir]     = useState<SortDir>('desc');
   const [trendingLimit, setTrendingLimit] = useState<number>(20);
 
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+
   // ── Fetch trending data ───────────────────────────────────────────────────
 
   const fetchTrending = useCallback(async () => {
@@ -96,6 +99,10 @@ export default function TrendingPage() {
   }, []);
 
   useEffect(() => { fetchTrending(); }, [fetchTrending]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, sortKey, sortDir]);
 
   // ── Auto-dismiss toast ─────────────────────────────────────────────────────
 
@@ -348,7 +355,7 @@ export default function TrendingPage() {
               )}
 
               {/* ── Data Rows ── */}
-              {!loading && filtered.map((product, idx) => {
+              {!loading && filtered.slice(page * pageSize, (page + 1) * pageSize).map((product, idx) => {
                 // Rank is based on the original sorted-by-score order
                 const globalRank = products.findIndex(p => p.product_id === product.product_id) + 1;
                 const isTop3 = globalRank <= 3;
@@ -438,7 +445,7 @@ export default function TrendingPage() {
                         <div className={styles.scoreValue}>
                           {product.trending_score % 1 === 0
                             ? product.trending_score.toLocaleString('fr-FR')
-                            : product.trending_score.toFixed(1).replace('.', ',')}
+                            : Number(product.trending_score || 0).toFixed(1).replace('.', ',')}
                         </div>
                         <div className={styles.scoreBar}>
                           <div
@@ -457,6 +464,37 @@ export default function TrendingPage() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* ── Pagination footer ── */}
+        <div className={styles.paginationBar}>
+          <div className={styles.rowsPerPage}>
+            <span>Lignes par page :</span>
+            <select
+              className={styles.pageSizeSelect}
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+          <div className={styles.pageNav}>
+            <button
+              className={styles.pageArrow}
+              onClick={() => setPage(p => p - 1)}
+              disabled={page === 0}
+              aria-label="Page précédente"
+            >&#8592;</button>
+            <span className={styles.pageCurrent}>{page + 1}</span>
+            <button
+              className={styles.pageArrow}
+              onClick={() => setPage(p => p + 1)}
+              disabled={(page + 1) * pageSize >= filtered.length}
+              aria-label="Page suivante"
+            >&#8594;</button>
+          </div>
         </div>
       </div>
 

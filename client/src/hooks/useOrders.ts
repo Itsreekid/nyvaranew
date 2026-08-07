@@ -1,132 +1,45 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { CreateOrderPayload, Category } from '@/types';
 
-// ─── useCategories ────────────────────────────────────────────────────────────
-
+// ?? useCategories ?????????????????????????????????????????????????????????
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) { setLoading(false); return; }
-    supabase
-      .from('categories')
-      .select('*')
-      .order('name', { ascending: true })
-      .then(({ data }) => {
-        setCategories((data as Category[]) ?? []);
-        setLoading(false);
-      });
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(({ data }) => { setCategories(data ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   return { categories, loading };
 }
 
-// ─── useCreateOrder ───────────────────────────────────────────────────────────
-
+// ?? useCreateOrder ????????????????????????????????????????????????????????
 export function useCreateOrder() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const createOrder = async (payload: CreateOrderPayload) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
+    setLoading(true); setError(null); setSuccess(false);
     try {
-      // 1. Calculate total from Supabase (price authoritative on server)
-      const productIds = payload.items.map(i => i.product_id);
-      const { data: rawProducts, error: prodErr } = await supabase
-        .from('products')
-        .select('id, price, discount, quantity_breaks, stock, allow_unlimited_stock')
-        .in('id', productIds);
-
-      if (prodErr) throw prodErr;
-      const products = rawProducts as { id: string; price: number | null; discount: number | null; quantity_breaks: any; stock: number | null; allow_unlimited_stock: boolean | null }[] | null;
-
-      // Map to store calculated unit price per item (takes quantity breaks into account)
-      const productTotals: Record<string, number> = {};
-      payload.items.forEach(item => {
-        productTotals[item.product_id] = (productTotals[item.product_id] || 0) + item.quantity;
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Order failed');
+      const order = json.data as { id: string };
 
-      const itemPrices = payload.items.map(i => {
-        const p = (products ?? []).find(prod => prod.id === i.product_id);
-        if (!p) return { id: i.product_id, price: 0 };
-
-        const totalQty = productTotals[i.product_id];
-        const breaks = (p.quantity_breaks || []) as any[];
-        const applicableBreak = [...breaks]
-          .sort((a, b) => b.min_qty - a.min_qty)
-          .find(qb => totalQty >= qb.min_qty);
-
-        if (applicableBreak) {
-          return { id: i.product_id, price: applicableBreak.total_price / totalQty };
-        } else {
-          const hasDiscount = p.discount != null && p.discount > 0;
-          const finalPrice = hasDiscount ? Math.round((p.price ?? 0) * (1 - (p.discount || 0) / 100)) : (p.price ?? 0);
-          return { id: i.product_id, price: finalPrice };
-        }
-      });
-
-      const total_price = payload.items.reduce(
-        (sum, item, idx) => sum + itemPrices[idx].price * item.quantity,
-        0
-      );
-
-      // 2. Insert order
-      const { data: rawOrder, error: orderErr } = await supabase
-        .from('orders')
-        .insert({
-          customer_name:  payload.customer_name,
-          customer_email: payload.customer_email,
-          phone:          payload.phone,
-          city:           payload.city,
-          postal_code:    payload.postal_code,
-          country:        payload.country,
-          address:        payload.address,
-          total_price,
-        } as never)
-        .select()
-        .single();
-
-      if (orderErr) throw orderErr;
-      const order = rawOrder as { id: string };
-
-      // 3. Insert order items
-      const orderItems = payload.items.map((i, idx) => ({
-        order_id:   order.id,
-        product_id: i.product_id,
-        quantity:   i.quantity,
-        selected_color_name: i.selected_color?.name ?? null,
-        selected_color_hex1: i.selected_color?.hex1 ?? null,
-        selected_color_hex2: i.selected_color?.hex2 ?? null,
-        quantity_break_price: itemPrices[idx].price,
-      }));
-
-      const { error: itemsErr } = await supabase
-        .from('order_items')
-        .insert(orderItems as never);
-
-      if (itemsErr) {
-        console.error('[createOrder] Failed to insert order items:', itemsErr);
-        throw itemsErr;
-      }
-
-      // 4. Cosmos dispatch removed. The order remains 'pending'.
-      // The admin will trigger the Cosmos API manually from the dashboard.
-
-      // 5. Trending: log order events for each item
+      // Trending: log order events for each item
       if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
         payload.items.forEach(item => {
-          navigator.sendBeacon(
-            '/api/tracking/stats',
-            JSON.stringify({ product_id: item.product_id, event: 'order' })
-          );
+          navigator.sendBeacon('/api/tracking/stats', JSON.stringify({ product_id: item.product_id, event: 'order' }));
         });
       }
 
@@ -135,9 +48,7 @@ export function useCreateOrder() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Order failed. Please try again.');
       return null;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return { createOrder, loading, error, success };

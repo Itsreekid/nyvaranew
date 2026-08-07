@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import type { Category } from '@/types';
+import { showAdminError } from '@/lib/admin-error';
 import adminStyles from '../admin.module.css';
 import styles from './categories.module.css';
 
@@ -15,11 +15,13 @@ export default function AdminCategoriesPage() {
   const [editName, setEditName]     = useState('');
 
   const fetchCategories = () => {
-    supabase.from('categories').select('*').order('name')
+    fetch('/api/categories')
+      .then(r => r.json())
       .then(({ data }) => {
         if (data) setCategories(data as Category[]);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => { fetchCategories(); }, []);
@@ -28,22 +30,23 @@ export default function AdminCategoriesPage() {
     e.preventDefault();
     if (!newName.trim()) return;
     setAdding(true);
-    const { error } = await supabase.from('categories').insert([{ name: newName.trim() }] as never);
+    const res = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName.trim() }) });
+    const json = await res.json();
     setAdding(false);
-    if (!error) { setNewName(''); fetchCategories(); }
-    else alert('Erreur: ' + error.message);
+    if (res.ok) { setNewName(''); fetchCategories(); }
+    else showAdminError(json.error);
   };
 
   const handleRename = async (id: string) => {
     if (!editName.trim()) return;
-    const { error } = await supabase.from('categories').update({ name: editName.trim() } as never).eq('id', id);
-    if (!error) { setEditId(null); setEditName(''); fetchCategories(); }
-    else alert('Erreur: ' + error.message);
+    const res = await fetch(`/api/categories/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editName.trim() }) });
+    const json = await res.json();
+    if (res.ok) { setEditId(null); setEditName(''); fetchCategories(); }
+    else showAdminError(json.error);
   };
 
   const handleDelete = async (id: string, name: string | null) => {
     if (!confirm(`Supprimer la catégorie "${name}" ? Les produits liés ne seront pas supprimés.`)) return;
-    await supabase.from('categories').delete().eq('id', id);
     fetchCategories();
   };
 

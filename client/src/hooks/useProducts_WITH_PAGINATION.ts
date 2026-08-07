@@ -1,19 +1,11 @@
-// File: src/hooks/useProducts.ts
-// Add pagination support to product loading
-
+// File: src/hooks/useProducts_WITH_PAGINATION.ts
 import { useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Product, ProductFilters } from '@/types';
 
-interface SortMap {
-  [key: string]: { column: string; ascending: boolean };
-}
-
-const sortMap: SortMap = {
-  'newest': { column: 'created_at', ascending: false },
-  'price-asc': { column: 'price', ascending: true },
-  'price-desc': { column: 'price', ascending: false },
-  'popular': { column: 'review_count', ascending: false },
+const sortApiMap: Record<string, string> = {
+  'newest':     'newest',
+  'price-asc':  'price-asc',
+  'price-desc': 'price-desc',
 };
 
 export function useProducts(
@@ -21,56 +13,36 @@ export function useProducts(
   sort: string
 ) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [filters, sort]);
+  useEffect(() => { fetchProducts(); }, [JSON.stringify(filters), sort]);
 
   const fetchProducts = async () => {
-    if (!isSupabaseConfigured) {
-      setProducts([]);
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       const pageSize = filters.pageSize || 20;
-      const page = filters.page || 0;
-      const offset = page * pageSize;
+      const page     = filters.page || 0;
+      const apiSort  = sortApiMap[sort] || 'newest';
 
-      const sortConfig = sortMap[sort] || sortMap['newest'];
+      const params = new URLSearchParams({
+        page: String(page), pageSize: String(pageSize), sort: apiSort,
+      });
+      if (filters.gender && filters.gender !== 'all') params.set('gender', filters.gender);
+      if (filters.search) params.set('search', filters.search);
 
-      let query = supabase
-        .from('products')
-        .select('*, categories:category_id(*)', { count: 'exact' })
-        .order(sortConfig.column, { ascending: sortConfig.ascending })
-        .range(offset, offset + pageSize - 1);
+      const res  = await fetch(`/api/products?${params}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
 
-      if (filters.gender && filters.gender !== 'all') {
-        query = query.eq('gender', filters.gender);
-      }
-
-      if (filters.search) {
-        query = query.ilike('title', `%${filters.search}%`);
-      }
-
-      const { data, error: err, count } = await query;
-
-      if (err) throw err;
-
-      setProducts(data || []);
-      setTotalCount(count || 0);
+      setProducts(json.data || []);
+      setTotalCount(json.count || 0);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error loading products');
       setProducts([]);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return { products, loading, error, totalCount };

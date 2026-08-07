@@ -1,20 +1,36 @@
 'use client';
 
-import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Globe, Share2, Mail } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import styles from './Footer.module.css';
 
-const SHOP_LINKS = [
-  { href: '/shop',               label: 'Toutes les lunettes' },
-  { href: '/shop?gender=homme',  label: 'Hommes' },
-  { href: '/shop?gender=femme',  label: 'Femmes' },
-  { href: '/shop?gender=unisex', label: 'Unisexe' },
-];
-const INFO_LINKS = [
-  { href: '/about',   label: 'À propos de Nyvara' },
-  { href: '/contact', label: 'Nous contacter' },
-];
+// Minimal SVGs for Socials
+function FacebookIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
+
+function InstagramIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function TikTokIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </svg>
+  );
+}
 
 export default function Footer() {
   const pathname = usePathname();
@@ -28,67 +44,41 @@ export default function Footer() {
       <div className={styles.inner}>
         {/* Brand */}
         <div className={styles.brand}>
-          <p className={styles.logo}>NYVARA</p>
+          <div className={styles.logoWrapper}>
+            <Image 
+              src="/logo.png" 
+              alt="NYVARA" 
+              width={140} 
+              height={45} 
+              style={{ objectFit: 'contain' }}
+              priority
+            />
+          </div>
           <p className={styles.tagline}>
-            La façon dont vous voyez le jour.<br />
-            Créez des lunettes au style unique.
+            La façon dont vous voyez le jour.
           </p>
+          
+          <a href="tel:+21658095226" aria-label="Appeler le support" className={styles.phoneLink} suppressHydrationWarning>
+            <Phone size={16} />
+            <span>+216 58 095 226</span>
+          </a>
+
           <div className={styles.socials}>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={styles.socialLink} suppressHydrationWarning>
-              <Globe size={18} />
+            <a href="https://www.instagram.com/nyvara_tn/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={styles.socialLink} suppressHydrationWarning>
+              <InstagramIcon size={18} />
             </a>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className={styles.socialLink} suppressHydrationWarning>
-              <Share2 size={18} />
+            <a href="https://www.facebook.com/Nyvara1/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className={styles.socialLink} suppressHydrationWarning>
+              <FacebookIcon size={18} />
             </a>
-            <a href="mailto:contact@nyvara.tn" aria-label="Email" className={styles.socialLink} suppressHydrationWarning>
-              <Mail size={18} />
+            <a href="https://www.tiktok.com/@nyvara.store" target="_blank" rel="noopener noreferrer" aria-label="TikTok" className={styles.socialLink} suppressHydrationWarning>
+              <TikTokIcon size={18} />
             </a>
           </div>
-        </div>
-
-        {/* Shop */}
-        <div className={styles.col}>
-          <h4 className={styles.colTitle}>Boutique</h4>
-          <ul className={styles.linkList}>
-            {SHOP_LINKS.map(l => (
-              <li key={l.href}>
-                <Link href={l.href} className={styles.footerLink}>{l.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Info */}
-        <div className={styles.col}>
-          <h4 className={styles.colTitle}>Informations</h4>
-          <ul className={styles.linkList}>
-            {INFO_LINKS.map(l => (
-              <li key={l.href}>
-                <Link href={l.href} className={styles.footerLink}>{l.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Newsletter */}
-        <div className={styles.newsletter}>
-          <h4 className={styles.colTitle}>Newsletter</h4>
-          <p className={styles.newsletterText}>Recevez nos offres exclusives et nos nouveautés directement dans votre boîte mail.</p>
-          <form className={styles.form} onSubmit={e => e.preventDefault()}>
-            <input
-              type="email"
-              placeholder="votre@email.com"
-              className={styles.emailInput}
-              aria-label="Adresse e-mail pour la newsletter"
-            />
-            <button type="submit" className={styles.subscribeBtn}>S’abonner</button>
-          </form>
         </div>
       </div>
 
       <div className={styles.bottom} suppressHydrationWarning>
         <p suppressHydrationWarning>&copy; {new Date().getFullYear()} Nyvara. Tous droits réservés.</p>
-        <p>Fait en Tunisie 🇹🇳</p>
       </div>
     </footer>
   );

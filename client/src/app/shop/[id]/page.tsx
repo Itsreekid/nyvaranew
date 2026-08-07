@@ -1,26 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import ProductDetail from './ProductDetail';
 import type { Product } from '@/types';
+import { sql } from '@/lib/db';
 
 export const revalidate = 0;
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
+interface Props { params: Promise<{ id: string }>; }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const { data } = await supabase
-    .from('products')
-    .select('title, description')
-    .eq('id', id)
-    .single();
+  const rows = await sql`SELECT title, description FROM products WHERE id = ${id} LIMIT 1`;
+  const data = rows[0] as any;
   return {
     title: data?.title ? `${data.title} — NYVARA` : 'Produit — NYVARA',
     description: data?.description ?? 'Découvrez notre collection de lunettes de luxe.',
@@ -30,24 +21,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ProductPage({ params }: Props) {
   const { id } = await params;
 
-  const [{ data: product }, { data: galleryData }] = await Promise.all([
-    supabase.from('products').select('*, categories(*)').eq('id', id).single(),
-    supabase.from('product_images').select('id, image_url, sort_order').eq('product_id', id).order('sort_order'),
+  const [productRows, galleryRows] = await Promise.all([
+    sql`
+      SELECT p.*, json_build_object('id', c.id, 'name', c.name) AS categories
+      FROM products p LEFT JOIN categories c ON c.id = p.category_id
+      WHERE p.id = ${id} LIMIT 1`,
+    sql`SELECT id, image_url, sort_order FROM product_images WHERE product_id = ${id} ORDER BY sort_order ASC`,
   ]);
 
+  const product = productRows[0] as any;
   if (!product) notFound();
 
-  // Related products — same category, exclude current
-  const { data: relatedData } = await supabase
-    .from('products')
-    .select('*, categories(*)')
-    .eq('category_id', product.category_id ?? '')
-    .neq('id', id)
-    .order('created_at', { ascending: false })
-    .limit(4);
+  const relatedRows = await sql`
+    SELECT p.*, json_build_object('id', c.id, 'name', c.name) AS categories
+    FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.category_id = ${product.category_id ?? '00000000-0000-0000-0000-000000000000'}::uuid
+      AND p.id != ${id}::uuid
+    ORDER BY p.created_at DESC LIMIT 4`;
 
-  const gallery: { id: string; image_url: string }[] = galleryData ?? [];
-  const related: Product[] = (relatedData as Product[]) ?? [];
+  const gallery: { id: string; image_url: string }[] = galleryRows as any[];
+  const related: Product[] = relatedRows as Product[];
 
   return <ProductDetail product={product as Product} gallery={gallery} related={related} />;
 }

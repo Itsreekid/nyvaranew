@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
 
@@ -13,9 +14,15 @@ interface ModalProps {
 }
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
   }, [onClose]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -28,9 +35,9 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
     };
   }, [isOpen, handleKey]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true">
       <div className={`${styles.modal} ${styles[size]}`} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
@@ -41,6 +48,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
         </div>
         <div className={styles.body}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

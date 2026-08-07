@@ -486,3 +486,75 @@ input:checked + .slider:before {
 input:checked + .sliderStatus {
   background-color: var(--color-success, #22c55e);
 }
+
+/* ── Pagination bar ──────────────────────────────── */
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #12122a;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0 0 10px 10px;
+}
+
+.rowsPerPage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+}
+
+.pageSizeSelect {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  padding-right: 4px;
+}
+.pageSizeSelect option { background: #1a1a2e; color: white; }
+
+.pageNav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pageArrow {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.pageArrow:hover:not(:disabled) {
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+.pageArrow:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.pageCurrent {
+  min-width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 6px;
+}

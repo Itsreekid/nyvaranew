@@ -9,6 +9,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import ProductCard from '@/components/shop/ProductCard';
 import type { Product, ColorOption } from '@/types';
+import Toast from '@/components/ui/Toast';
 import styles from './product.module.css';
 import { fbEvent } from '@/components/analytics/FacebookPixel';
 
@@ -99,6 +100,8 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   // Colors — support multiple selections for bundles
   const [selectedColors, setSelectedColors] = useState<(ColorOption | null)[]>([]);
   const [qty, setQty] = useState(1);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hasShake, setHasShake] = useState(false);
 
   // Initialize/resize selectedColors when qty changes
   useEffect(() => {
@@ -166,9 +169,38 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   const handleThumbClick = (idx: number) => {
     setActiveIdx(idx);
     setAutoPlayStopped(true);
+
+    const clickedSrc = allImages[idx];
+    if (clickedSrc && product.color_options && product.color_options.length > 0) {
+      const matchedColor = product.color_options.find(
+        co => co.image_url === clickedSrc || co.image_url2 === clickedSrc
+      );
+      if (matchedColor && selectedColors[0]?.id !== matchedColor.id) {
+        if (qty === 1) {
+          setSelectedColors([matchedColor]);
+          setLastSelectedColor(matchedColor);
+        }
+      }
+    }
+  };
+
+  const validateColors = (): boolean => {
+    if (product.color_options && product.color_options.length > 0) {
+      const hasMissingColor = selectedColors.some(c => c === null);
+      if (hasMissingColor || selectedColors.length === 0) {
+        setToastMessage('Veuillez choisir une couleur pour continuer');
+        setHasShake(true);
+        setTimeout(() => setHasShake(false), 500);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return false;
+      }
+    }
+    return true;
   };
 
   const handleAddToCart = () => {
+    if (!validateColors()) return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     selectedColors.forEach(color => {
       addItem(product, color ?? undefined);
     });
@@ -190,6 +222,9 @@ export default function ProductDetail({ product, gallery, related }: Props) {
 
   // Direct checkout: add to cart then jump straight to checkout form
   const handleBuyNow = () => {
+    if (!validateColors()) return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     selectedColors.forEach(color => {
       addItem(product, color ?? undefined);
     });
@@ -231,6 +266,33 @@ export default function ProductDetail({ product, gallery, related }: Props) {
           <ArrowLeft size={14} /> Retour à la boutique
         </Link>
 
+        {toastMessage && (
+          <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999 }}>
+            <Toast message={toastMessage} type="error" onClose={() => setToastMessage(null)} />
+          </div>
+        )}
+
+        {/* ══════════ MOBILE HEADER ══════════ */}
+        <div className={styles.mobileHeader}>
+          {product.badge && (
+            <div className={styles.heroBadge}>{product.badge}</div>
+          )}
+          <div className={styles.metaRow}>
+            {product.categories?.name && <span className={styles.category}>{product.categories.name}</span>}
+            {product.gender && <span className={styles.genderPill}>{genderLabel[product.gender]}</span>}
+          </div>
+          <h1 className={styles.title}>{product.title ?? 'Sunglasses'}</h1>
+          {product.rating != null && (
+            <div className={styles.ratingRow}>
+              <Stars rating={product.rating} />
+              <span className={styles.ratingNum}>{Number(product.rating || 0).toFixed(1)}</span>
+              {product.review_count != null && (
+                <span className={styles.reviewCount}>({product.review_count.toLocaleString('fr-FR')} avis)</span>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* ══════════ HERO ══════════ */}
         <div className={styles.hero}>
 
@@ -256,6 +318,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                   className={styles.image}
                   sizes="(max-width: 768px) 100vw, 50vw"
                   priority
+                  fetchPriority="high"
                 />
               ) : (
                 <div className={styles.placeholder}>NYVARA</div>
@@ -286,42 +349,22 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                     onClick={() => handleThumbClick(idx)}
                     aria-label={`Photo ${idx + 1}`}
                   >
-                    <Image src={src} alt={`Vue ${idx + 1}`} fill className={styles.thumbImg} sizes="80px" />
+                    <Image src={src} alt={`Vue ${idx + 1}`} fill className={styles.thumbImg} sizes="80px" loading="lazy" />
                   </button>
                 ))}
               </div>
             )}
-          </div>
 
-          {/* RIGHT — Buy box */}
-          <div className={styles.buyBox}>
-            {/* Badge + meta */}
-            {product.badge && (
-              <div className={styles.heroBadge}>{product.badge}</div>
-            )}
-            <div className={styles.metaRow}>
-              {product.categories?.name && <span className={styles.category}>{product.categories.name}</span>}
-              {product.gender && <span className={styles.genderPill}>{genderLabel[product.gender]}</span>}
-            </div>
-
-            {/* Title */}
-            <h1 className={styles.title}>{product.title ?? 'Sunglasses'}</h1>
-
-            {/* Rating */}
-            {product.rating != null && (
-              <div className={styles.ratingRow}>
-                <Stars rating={product.rating} />
-                <span className={styles.ratingNum}>{product.rating.toFixed(1)}</span>
-                {product.review_count != null && (
-                  <span className={styles.reviewCount}>({product.review_count.toLocaleString('fr-FR')} avis)</span>
-                )}
-              </div>
-            )}
-            {/* Color Selector (Only for 1 unit) */}
+            {/* Color Selector — Mobile Only */}
             {qty === 1 && product.color_options && product.color_options.length > 0 && (
-              <div className={styles.colorSelector}>
-                <p className={styles.colorLabel}>Couleur : <strong>{selectedColors[0]?.name || 'Veuillez choisir'}</strong></p>
-                <div className={styles.colorList}>
+              <div className={`${styles.colorSelector} ${styles.mobileColorSelector}`}>
+                <p className={styles.colorLabel} style={{ textAlign: 'center', marginBottom: '12px', fontSize: '15px' }}>Couleur : <strong>{selectedColors[0]?.name || 'Veuillez choisir'}</strong></p>
+                <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ justifyContent: 'center', position: 'relative' }}>
+                  {hasShake && (
+                    <div className={styles.colorTooltip}>
+                      Veuillez choisir une couleur pour continuer
+                    </div>
+                  )}
                   {product.color_options.map(co => (
                     <button
                       key={co.id}
@@ -335,15 +378,43 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                         setActiveIdx(colorImageIndex[co.id] ?? 0);
                         setAutoPlayStopped(true);
                       }}
-                      style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)` } : { background: co.hex1 }}
+                      style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)`, width: '36px', height: '36px' } : { background: co.hex1, width: '36px', height: '36px' }}
                       title={co.name}
                     />
                   ))}
                 </div>
               </div>
             )}
+          </div>
 
-            <hr className={styles.divider} />
+          {/* RIGHT — Buy box */}
+          <div className={styles.buyBox}>
+            <div className={styles.desktopHeader}>
+              {/* Badge + meta */}
+              {product.badge && (
+                <div className={styles.heroBadge}>{product.badge}</div>
+              )}
+              <div className={styles.metaRow}>
+                {product.categories?.name && <span className={styles.category}>{product.categories.name}</span>}
+                {product.gender && <span className={styles.genderPill}>{genderLabel[product.gender]}</span>}
+              </div>
+
+              {/* Title */}
+              <h1 className={styles.title}>{product.title ?? 'Sunglasses'}</h1>
+
+              {/* Rating */}
+              {product.rating != null && (
+                <div className={styles.ratingRow}>
+                  <Stars rating={product.rating} />
+                  <span className={styles.ratingNum}>{Number(product.rating || 0).toFixed(1)}</span>
+                  {product.review_count != null && (
+                    <span className={styles.reviewCount}>({product.review_count.toLocaleString('fr-FR')} avis)</span>
+                  )}
+                </div>
+              )}
+
+              <hr className={styles.divider} />
+            </div>
 
             {/* Price */}
             <div className={styles.priceBlock}>
@@ -360,6 +431,11 @@ export default function ProductDetail({ product, gallery, related }: Props) {
 
             <hr className={styles.divider} />
 
+            {/* Stock */}
+            <div className={inStockBool ? styles.inStock : styles.outOfStock}>
+              {inStockBool ? <><CheckCircle2 size={16} /> En stock</> : (product.is_active === false ? '✗ Indisponible' : '✗ Rupture de stock')}
+            </div>
+
             {/* Feature bullets */}
             {featuresList.length > 0 && (
               <ul className={styles.featuresList}>
@@ -373,11 +449,6 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             )}
 
             <hr className={styles.divider} />
-
-            {/* Stock */}
-            <p className={inStockBool ? styles.inStock : styles.outOfStock}>
-              {inStockBool ? `✓ En stock` : (product.is_active === false ? '✗ Indisponible' : '✗ Rupture de stock')}
-            </p>
 
             {/* Quantity Breaks (Offres de quantité) */}
             {product.quantity_breaks && product.quantity_breaks.length > 0 && inStockBool && (
@@ -453,7 +524,36 @@ export default function ProductDetail({ product, gallery, related }: Props) {
               </div>
             )}
 
-            {/* Selection des couleurs après l'offre - REMOVED from here, now inside cards */}
+            {/* Selection des couleurs après l'offre — Desktop Only */}
+            {qty === 1 && product.color_options && product.color_options.length > 0 && (
+              <div className={`${styles.colorSelector} ${styles.desktopColorSelector}`}>
+                <p className={styles.colorLabel}>Couleur : <strong>{selectedColors[0]?.name || 'Veuillez choisir'}</strong></p>
+                <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ position: 'relative' }}>
+                  {hasShake && (
+                    <div className={styles.colorTooltip}>
+                      Veuillez choisir une couleur pour continuer
+                    </div>
+                  )}
+                  {product.color_options.map(co => (
+                    <button
+                      key={co.id}
+                      disabled={co.isAvailable === false}
+                      className={`${styles.colorCircle} ${selectedColors[0]?.id === co.id ? styles.colorCircleActive : ''} ${co.isAvailable === false ? styles.colorDisabled : ''}`}
+                      onClick={() => {
+                        if (selectedColors[0]?.id === co.id) return;
+                        const newColors = [co];
+                        setSelectedColors(newColors);
+                        setLastSelectedColor(co);
+                        setActiveIdx(colorImageIndex[co.id] ?? 0);
+                        setAutoPlayStopped(true);
+                      }}
+                      style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)` } : { background: co.hex1 }}
+                      title={co.name}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quantity Selector (Show only if no breaks) */}
             {inStockBool && (!product.quantity_breaks || product.quantity_breaks.length === 0) && (
@@ -471,7 +571,6 @@ export default function ProductDetail({ product, gallery, related }: Props) {
               </div>
             )}
 
-            {/* Actions */}
             <div className={styles.actions}>
               {/* Primary CTA — jump straight to checkout */}
               <button
@@ -479,6 +578,14 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                 onClick={handleBuyNow}
                 disabled={!inStockBool}
               >
+                {selectedColors[0] && (
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: selectedColors[0].hex2 ? `linear-gradient(135deg, ${selectedColors[0].hex1} 50%, ${selectedColors[0].hex2} 50%)` : selectedColors[0].hex1,
+                    border: '2px solid rgba(255,255,255,0.4)',
+                    boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
+                  }} />
+                )}
                 <ShoppingBag size={18} />
                 Passer commande
               </button>
@@ -610,6 +717,14 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             onClick={handleBuyNow}
             disabled={!inStockBool}
           >
+            {selectedColors[0] && (
+              <div style={{
+                width: 14, height: 14, borderRadius: '50%',
+                background: selectedColors[0].hex2 ? `linear-gradient(135deg, ${selectedColors[0].hex1} 50%, ${selectedColors[0].hex2} 50%)` : selectedColors[0].hex1,
+                border: '1px solid rgba(255,255,255,0.4)',
+                marginRight: '2px'
+              }} />
+            )}
             <ShoppingBag size={16} />
             {inStockBool ? 'Passer commande' : 'Rupture de stock'}
           </button>

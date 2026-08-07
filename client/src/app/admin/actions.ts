@@ -2,101 +2,76 @@
 
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
-import supabaseAdmin from '@/lib/supabase-admin';
+import { sql } from '@/lib/db';
 
-// ── Login ─────────────────────────────────────────────────────────────────
+// ?? Login ?????????????????????????????????????????????????????????????????
 export async function loginAction(formData: FormData) {
   const username = (formData.get('username') as string)?.toLowerCase().trim();
   const password = formData.get('password') as string;
+  if (!username || !password) return { error: 'Veuillez remplir tous les champs.' };
 
-  if (!username || !password) {
-    return { error: 'Veuillez remplir tous les champs.' };
-  }
-
-  const { data } = await supabaseAdmin
-    .from('admin_users')
-    .select('id, password_hash, role, full_name')
-    .eq('username', username)
-    .single();
-
-  const user: any = data;
-
-  if (!user) return { error: 'Identifiants incorrects.' };
-
-  const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return { error: 'Identifiants incorrects.' };
-
-  const cookieStore = await cookies();
-  cookieStore.set('nyvara_admin_session', user.role, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/',
-  });
-
-  return { success: true, role: user.role as string };
+  try {
+    const rows = await sql`
+      SELECT id, password_hash, role, full_name FROM admin_users
+      WHERE username = ${username} LIMIT 1`;
+    const user = rows[0] as any;
+    if (!user) return { error: 'Identifiants incorrects.' };
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return { error: 'Identifiants incorrects.' };
+    const cookieStore = await cookies();
+    cookieStore.set('nyvara_admin_session', user.role, {
+      httpOnly: true, secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict', maxAge: 60 * 60 * 24 * 7, path: '/',
+    });
+    return { success: true, role: user.role as string };
+  } catch (err: any) { return { error: err.message }; }
 }
 
-// ── Logout ────────────────────────────────────────────────────────────────
+// ?? Logout ????????????????????????????????????????????????????????????????
 export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete('nyvara_admin_session');
 }
 
-// ── Get all users ─────────────────────────────────────────────────────────
+// ?? Get all users ?????????????????????????????????????????????????????????
 export async function getEmployeesAction() {
-  const { data, error } = await supabaseAdmin
-    .from('admin_users')
-    .select('id, username, full_name, role, created_at')
-    .order('created_at', { ascending: true });
-
-  if (error) return { error: 'Erreur de chargement.' };
-  return { data };
+  try {
+    const data = await sql`
+      SELECT id, username, full_name, role, created_at
+      FROM admin_users ORDER BY created_at ASC`;
+    return { data };
+  } catch { return { error: 'Erreur de chargement.' }; }
 }
 
-// ── Add user ──────────────────────────────────────────────────────────────
+// ?? Add user ??????????????????????????????????????????????????????????????
 export async function addEmployeeAction(formData: FormData) {
   const username  = (formData.get('username')  as string)?.toLowerCase().trim();
   const password  = formData.get('password')  as string;
   const full_name = formData.get('full_name') as string;
   const role      = formData.get('role')      as string;
-
-  if (!username || !password || !full_name || !role) {
-    return { error: 'Tous les champs sont requis.' };
+  if (!username || !password || !full_name || !role) return { error: 'Tous les champs sont requis.' };
+  try {
+    const hash = await bcrypt.hash(password, 12);
+    await sql`INSERT INTO admin_users (username, password_hash, role, full_name) VALUES (${username}, ${hash}, ${role}, ${full_name})`;
+    return { success: true };
+  } catch (err: any) {
+    if (err.message?.includes('23505') || err.message?.includes('unique')) return { error: "Ce nom d'utilisateur est d?j? pris." };
+    return { error: 'Erreur lors de la cr?ation.' };
   }
-
-  const hash = await bcrypt.hash(password, 12);
-
-  const { error } = await supabaseAdmin.from('admin_users').insert({
-    username, password_hash: hash, role, full_name,
-  } as never);
-
-  if (error) {
-    if (error.code === '23505') return { error: "Ce nom d'utilisateur est déjà pris." };
-    return { error: 'Erreur lors de la création.' };
-  }
-  return { success: true };
 }
 
-// ── Remove user ───────────────────────────────────────────────────────────
+// ?? Remove user ???????????????????????????????????????????????????????????
 export async function removeEmployeeAction(id: string) {
-  const { error } = await supabaseAdmin
-    .from('admin_users')
-    .delete()
-    .eq('id', id);
-
-  if (error) return { error: 'Erreur lors de la suppression.' };
-  return { success: true };
+  try {
+    await sql`DELETE FROM admin_users WHERE id = ${id}::uuid`;
+    return { success: true };
+  } catch { return { error: 'Erreur lors de la suppression.' }; }
 }
 
-// ── Remove Product Image ──────────────────────────────────────────────────
+// ?? Remove Product Image ??????????????????????????????????????????????????
 export async function deleteProductImageAction(id: string) {
-  const { error } = await supabaseAdmin
-    .from('product_images')
-    .delete()
-    .eq('id', id);
-
-  if (error) return { error: error.message };
-  return { success: true };
+  try {
+    await sql`DELETE FROM product_images WHERE id = ${id}::uuid`;
+    return { success: true };
+  } catch (err: any) { return { error: err.message }; }
 }

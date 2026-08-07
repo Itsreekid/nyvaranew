@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { Hourglass, CheckCircle2, Package, Truck, Home } from 'lucide-react';
 import Link from 'next/link';
 import styles from './TrackOrder.module.css';
@@ -35,13 +34,10 @@ export default function TrackOrderPage() {
     if (!orderId) return;
 
     const fetchOrder = async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, customer_name, cosmos_status, cosmos_barcode')
-        .eq('id', orderId)
-        .single();
-
-      if (error || !data) {
+      const res = await fetch(`/api/orders/${orderId}`);
+      const json = await res.json();
+      const data = json.data;
+      if (!res.ok || !data) {
         setError('Commande introuvable.');
       } else {
         setOrder(data);

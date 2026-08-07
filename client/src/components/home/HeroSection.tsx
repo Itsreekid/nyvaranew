@@ -86,6 +86,7 @@ export default function HeroSection() {
               alt="Modèle portant des lunettes de soleil Nyvara"
               fill
               priority
+              fetchPriority="high"
               sizes="(max-width: 900px) 100vw, 55vw"
               className={styles.modelImg}
             />

@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { supabase } from '@/lib/supabase';
 import { uploadImageToR2 } from '@/lib/r2-upload';
 import type { Product, Category, ColorOption, QuantityBreak } from '@/types';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import ImageUpload from '@/components/admin/ImageUpload';
-import { PlusCircle, Trash2, ImageIcon, Loader2 } from 'lucide-react';
+import Toggle from '@/components/ui/Toggle';
+import dynamic from 'next/dynamic';
+import { PlusCircle, Trash2, ImageIcon, Loader2, Edit2 } from 'lucide-react';
+const ImageUpload = dynamic(() => import('@/components/admin/ImageUpload'), { ssr: false });
+const Modal = dynamic(() => import('@/components/ui/Modal'), { ssr: false });
 import { deleteProductImageAction } from '../actions';
+import { showAdminError } from '@/lib/admin-error';
+import { showAdminSuccess } from '@/lib/admin-success';
 import adminStyles from '../admin.module.css';
 import styles from './products.module.css';
 
@@ -52,6 +55,10 @@ export default function AdminProductsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+
   // Modal
   const [modalOpen, setModalOpen]         = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -71,17 +78,19 @@ export default function AdminProductsPage() {
 
   const fetchAll = () => {
     setLoading(true);
+    const ts = Date.now();
     Promise.all([
-      supabase.from('products').select('*, categories(*)').order('created_at', { ascending: false }).limit(200),
-      supabase.from('categories').select('*').order('name'),
-    ]).then(([{ data: prods }, { data: cats }]) => {
-      if (prods) setProducts(prods as Product[]);
-      if (cats)  setCategories(cats as Category[]);
+      fetch(`/api/products?sort=newest&page=${page}&pageSize=${pageSize}&_t=${ts}`).then(r => r.json()),
+      fetch(`/api/categories?_t=${ts}`).then(r => r.json()),
+    ]).then(([prodsJson, catsJson]) => {
+      if (prodsJson.data) setProducts(prodsJson.data as Product[]);
+      if (prodsJson.count !== undefined) setTotalCount(prodsJson.count);
+      if (catsJson.data)  setCategories(catsJson.data as Category[]);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [page, pageSize]);
 
   const openAddModal = () => {
     setEditingProduct(null);
@@ -119,12 +128,9 @@ export default function AdminProductsPage() {
     const specs = (p.specs ?? {}) as Record<string, string>;
     setSpecRows(Object.entries(specs).map(([key, value]) => ({ key, value })));
     // Load gallery images for this product
-    const { data } = await supabase
-      .from('product_images')
-      .select('*')
-      .eq('product_id', p.id)
-      .order('sort_order');
-    setGalleryImages((data as GalleryImage[]) ?? []);
+    const galleryRes = await fetch(`/api/products/${p.id}/images`);
+    const galleryJson = await galleryRes.json();
+    setGalleryImages((galleryJson.data as GalleryImage[]) ?? []);
     setColorOptions(p.color_options ?? []);
     setQuantityBreaks(p.quantity_breaks ?? []);
     setModalOpen(true);
@@ -171,9 +177,11 @@ export default function AdminProductsPage() {
       allow_unlimited_stock: formData.allow_unlimited_stock,
     };
 
-    const { error } = editingProduct
-      ? await supabase.from('products').update(payload as never).eq('id', editingProduct.id)
-      : await supabase.from('products').insert([payload as never]);
+    const res = editingProduct
+      ? await fetch(`/api/products/${editingProduct.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      : await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const resJson = await res.json();
+    const error = res.ok ? null : { message: resJson.error || 'Unknown error' };
 
     setSubmitting(false);
     if (!error) {
@@ -181,15 +189,22 @@ export default function AdminProductsPage() {
       setFormData(emptyForm);
       setEditingProduct(null);
       fetchAll();
+      showAdminSuccess('Produit enregistré avec succès !');
     } else {
-      alert('Erreur: ' + error.message);
+      showAdminError(error.message);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Supprimer ce produit ?')) return;
-    await supabase.from('products').delete().eq('id', id);
+    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json();
+      showAdminError(`Impossible de supprimer ce produit : ${data.error || 'Erreur inconnue'}\n\nAstuce : Si le produit est lié à des commandes, désactivez-le (Statut: Inactif) au lieu de le supprimer.`);
+      return;
+    }
     fetchAll();
+    showAdminSuccess('Produit supprimé avec succès !');
   };
 
   // ── Gallery upload — direct R2 upload ─────────────────────────────────────
@@ -202,11 +217,10 @@ export default function AdminProductsPage() {
       setGalleryPhase('uploading');
       const publicUrl = await uploadImageToR2(file, 'gallery');
       const nextOrder = galleryImages.length;
-      const { data: img, error: dbErr } = await supabase
-        .from('product_images')
-        .insert({ product_id: editingProduct.id, image_url: publicUrl, sort_order: nextOrder } as never)
-        .select()
-        .single();
+      const imgRes = await fetch(`/api/products/${editingProduct.id}/images`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: publicUrl, sort_order: nextOrder }) });
+      const imgJson = await imgRes.json();
+      const img = imgJson.data;
+      const dbErr = imgRes.ok ? null : { message: imgJson.error };
       if (dbErr) throw dbErr;
       setGalleryImages(prev => [...prev, img as GalleryImage]);
     } catch (err: unknown) {
@@ -224,7 +238,7 @@ export default function AdminProductsPage() {
     // Call server action to bypass RLS
     const res = await deleteProductImageAction(id);
     if (res.error) {
-      alert('Erreur lors de la suppression en base de données: ' + res.error);
+      showAdminError('Erreur lors de la suppression en base de données: ' + res.error);
       return;
     }
 
@@ -255,85 +269,164 @@ export default function AdminProductsPage() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
 
-  if (loading) return <div className={adminStyles.contentArea}>Chargement...</div>;
+  if (loading && products.length === 0) return <div className={adminStyles.contentArea}>Chargement...</div>;
 
   return (
-    <div>
-      <div className={adminStyles.pageHeader}>
-        <h1 className={adminStyles.pageTitle}>Produits</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Produits</h1>
         <Button variant="primary" onClick={openAddModal}>+ Ajouter un produit</Button>
       </div>
 
-      <div className={adminStyles.tableContainer}>
-        <div className={adminStyles.tableScrollWrapper}>
-          <table className={adminStyles.table}>
-          <thead>
-            <tr>
-              <th>Image</th>
-              <th>Nom</th>
-              <th>Catégorie</th>
-              <th>Stock</th>
-              <th>Prix vente</th>
-              <th>Prix achat</th>
-              <th>Remise</th>
-              <th>Marge</th>
-              <th>Genre</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map(p => {
-              const m = margin(p);
-              return (
-                <tr key={p.id}>
-                  <td>
-                    <Image
-                      src={p.image_url || '/placeholder.png'}
-                      alt={p.title || 'Product'}
-                      width={48}
-                      height={48}
-                      className={styles.productImage}
-                      unoptimized
-                    />
-                  </td>
-                  <td>{p.title}</td>
-                  <td>{p.categories?.name ?? <span className={styles.noCost}>—</span>}</td>
-                  <td>
-                    {p.stock != null && p.stock > 0
-                      ? <span style={{ color: 'var(--color-charcoal)' }}>{p.stock}</span>
-                      : <span style={{ color: 'var(--color-error)' }}>Rupture</span>}
-                  </td>
-                  <td>{(p.final_price ?? p.price)?.toFixed(3)} TND</td>
-                  <td>
-                    {p.cost_price != null
-                      ? <span className={styles.costPrice}>{p.cost_price.toFixed(3)} TND</span>
-                      : <span className={styles.noCost}>—</span>}
-                  </td>
-                  <td>
-                    {p.discount != null
-                      ? <span className={styles.discountBadge}>-{Math.round(p.discount)}%</span>
-                      : <span className={styles.noCost}>—</span>}
-                  </td>
-                  <td>
-                    {m != null
-                      ? <span className={m >= 0 ? styles.marginPos : styles.marginNeg}>{m.toFixed(3)} TND</span>
-                      : <span className={styles.noCost}>—</span>}
-                  </td>
-                  <td>{p.gender}</td>
-                  <td>
-                    <div className={styles.actionBtns}>
-                      <button className={styles.actionBtn} onClick={() => openEditModal(p)}>✏️ Éditer</button>
-                      <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => handleDelete(p.id)}>🗑</button>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Desktop Table (hidden on mobile) */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-medium">
+              <tr>
+                <th className="px-4 py-3">Image</th>
+                <th className="px-4 py-3">Nom</th>
+                <th className="px-4 py-3">Stock</th>
+                <th className="px-4 py-3 text-right">Prix vente</th>
+                <th className="px-4 py-3 text-right">Prix achat</th>
+                <th className="px-4 py-3 text-center">Remise</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {products.map(p => {
+                const m = margin(p);
+                return (
+                  <tr key={p.id} className="hover:bg-gray-50/80 transition-colors group">
+                    <td className="px-4 py-2">
+                      <Image
+                        src={p.image_url || '/placeholder.png'}
+                        alt={p.title || 'Product'}
+                        width={48}
+                        height={48}
+                        className="w-12 h-12 object-cover rounded-md border border-gray-200"
+                        loading="lazy"
+                      />
+                    </td>
+                    <td className="px-4 py-2 font-medium text-gray-900">{p.title}</td>
+                    <td className="px-4 py-2">
+                      {p.stock != null && p.stock > 0
+                        ? <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">{p.stock} en stock</span>
+                        : <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">Rupture</span>}
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium text-gray-900">{Number(p.final_price ?? p.price ?? 0).toFixed(3)} TND</td>
+                    <td className="px-4 py-2 text-right text-gray-500">
+                      {p.cost_price != null
+                        ? `${Number(p.cost_price).toFixed(3)} TND`
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {p.discount != null
+                        ? <span className="inline-flex items-center justify-center px-2 py-1 rounded-md text-xs font-bold bg-nyvara-gold/10 text-nyvara-gold">-{Math.round(p.discount)}%</span>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <button className="p-1.5 text-nyvara-gold hover:bg-nyvara-gold/10 rounded-md transition-colors" onClick={() => openEditModal(p)} title="Éditer">
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" onClick={() => handleDelete(p.id)} title="Supprimer">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {products.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">Aucun produit.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Stacked Cards (hidden on desktop) */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {products.map(p => {
+            const m = margin(p);
+            return (
+              <div key={p.id} className="p-4 space-y-4">
+                <div className="flex gap-4">
+                  <Image
+                    src={p.image_url || '/placeholder.png'}
+                    alt={p.title || 'Product'}
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 object-cover rounded-lg border border-gray-200 shrink-0"
+                    unoptimized
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">{p.title}</h3>
+                    <p className="text-sm text-gray-500">{p.categories?.name ?? 'Sans catégorie'}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{Number(p.final_price ?? p.price ?? 0).toFixed(3)} TND</span>
+                      {p.discount != null && (
+                        <span className="text-xs font-bold bg-nyvara-gold/10 text-nyvara-gold px-1.5 py-0.5 rounded">-{Math.round(p.discount)}%</span>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {products.length === 0 && (
-              <tr><td colSpan={10} style={{ textAlign: 'center' }}>Aucun produit.</td></tr>
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex gap-2">
+                    {p.stock != null && p.stock > 0
+                        ? <span className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700">{p.stock} en stock</span>
+                        : <span className="px-2 py-1 rounded text-xs font-medium bg-red-50 text-red-700">Rupture</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors" onClick={() => openEditModal(p)}>
+                      <Edit2 size={14} /> Éditer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {products.length === 0 && (
+            <div className="p-8 text-center text-gray-500">Aucun produit.</div>
+          )}
+        </div>
+
+        {/* Pagination footer */}
+        <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between sm:px-6">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700 hidden sm:block">Lignes par page :</span>
+            <select
+              className="text-sm border-gray-300 rounded-md py-1 pl-2 pr-8 focus:ring-nyvara-gold focus:border-nyvara-gold"
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-700">
+              Page <span className="font-medium">{page + 1}</span>
+            </span>
+            <div className="flex gap-1">
+              <button
+                className="p-1 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent"
+                onClick={() => setPage(p => p - 1)}
+                disabled={page === 0}
+              >
+                &larr;
+              </button>
+              <button
+                className="p-1 rounded text-gray-500 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent"
+                onClick={() => setPage(p => p + 1)}
+                disabled={(page + 1) * pageSize >= totalCount}
+              >
+                &rarr;
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -401,39 +494,17 @@ export default function AdminProductsPage() {
             </div>
           </div>
 
-          <div className={styles.priceRow}>
-            <div className={styles.inputGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--color-surface)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-              <label style={{ margin: 0 }}>Statut du produit :</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label className={styles.switch}>
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                  />
-                  <span className={`${styles.slider} ${styles.sliderStatus}`}></span>
-                </label>
-                <span style={{ color: formData.is_active ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>
-                  {formData.is_active ? 'Actif' : 'Inactif (Rupture)'}
-                </span>
-              </div>
-            </div>
-            <div className={styles.inputGroup} style={{ flexDirection: 'row', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--color-surface)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-              <label style={{ margin: 0 }}>Gestion du stock :</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label className={styles.switch}>
-                  <input
-                    type="checkbox"
-                    checked={formData.allow_unlimited_stock}
-                    onChange={(e) => setFormData(prev => ({ ...prev, allow_unlimited_stock: e.target.checked }))}
-                  />
-                  <span className={styles.slider}></span>
-                </label>
-                <span style={{ fontSize: '0.95rem' }}>
-                  {formData.allow_unlimited_stock ? 'Stock Illimité (Dépot)' : 'Stock Limité (Auto-décrément)'}
-                </span>
-              </div>
-            </div>
+          <div className="flex flex-col sm:flex-row gap-6 mt-4 mb-4">
+            <Toggle 
+              label="Actif (visible sur le site)"
+              checked={formData.is_active}
+              onChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+            />
+            <Toggle 
+              label="Stock illimité (ignorer le compteur)"
+              checked={formData.allow_unlimited_stock}
+              onChange={(checked) => setFormData(prev => ({ ...prev, allow_unlimited_stock: checked }))}
+            />
           </div>
 
           {/* Main image */}
@@ -649,7 +720,7 @@ export default function AdminProductsPage() {
                       width={80}
                       height={80}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      unoptimized
+                      loading="lazy"
                     />
                     <button
                       type="button"

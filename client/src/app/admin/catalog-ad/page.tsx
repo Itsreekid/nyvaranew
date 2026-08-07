@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import { useProducts } from '@/hooks/useProducts';
 import type { Product } from '@/types';
-import { supabase } from '@/lib/supabase';
 import { buildMetaCatalogCsvRow, buildMetaCatalogXmlItem } from '@/lib/meta-catalog';
 import adminStyles from '@/app/admin/admin.module.css';
 import styles from './catalog-ad.module.css';
@@ -37,15 +36,16 @@ function buildCsv(products: Product[], galleryByProduct: Record<string, string[]
 async function fetchGalleryByProduct(productIds: string[]): Promise<Record<string, string[]>> {
   if (productIds.length === 0) return {};
 
-  const { data, error } = await supabase
-    .from('product_images')
-    .select('product_id, image_url')
-    .in('product_id', productIds)
-    .order('sort_order', { ascending: true });
+  const res = await fetch('/api/products/gallery-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: productIds }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  const data = (json.data as any[]) ?? [];
 
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).reduce<Record<string, string[]>>((acc, row: any) => {
+  return data.reduce<Record<string, string[]>>((acc, row: any) => {
     if (!acc[row.product_id]) acc[row.product_id] = [];
     acc[row.product_id].push(row.image_url);
     return acc;
@@ -214,7 +214,7 @@ export default function CatalogAdPage() {
                       </div>
                     </div>
                     <div className={styles.productPrice}>
-                      {(p.final_price ?? p.price ?? 0).toFixed(3)} TND
+                      {Number(p.final_price ?? p.price ?? 0).toFixed(3)} TND
                     </div>
                   </button>
                 );

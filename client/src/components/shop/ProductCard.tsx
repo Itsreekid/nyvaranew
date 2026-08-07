@@ -94,6 +94,9 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               className={styles.image}
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               priority={priority}
+              loading={priority ? undefined : "lazy"}
+              placeholder="blur"
+              blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO88OjRfwwAI6wDzX8/rDAAAAAASUVORK5CYII="
             />
           ) : (
             <div className={styles.imagePlaceholder} aria-hidden="true">
