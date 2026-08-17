@@ -1,6 +1,6 @@
 // ─── Supabase Table Types ──────────────────────────────────────────────────
 
-export type Gender = 'homme' | 'femme' | 'unisex';
+export type Gender = 'homme' | 'femme' | 'unisex' | 'enfant';
 
 export interface Category {
   id: string;

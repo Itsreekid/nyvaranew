@@ -22,6 +22,7 @@ const genderLabel: Record<string, string> = {
   homme: "Men's",
   femme: "Women's",
   unisex: 'Unisex',
+  enfant: "Kids'",
 };
 
 interface GalleryImage { id: string; image_url: string; }

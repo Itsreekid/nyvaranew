@@ -91,6 +91,7 @@ function escXml(value: string): string {
 function mapGender(gender: MetaCatalogProduct['gender']): string {
   if (gender === 'homme') return 'male';
   if (gender === 'femme') return 'female';
+  if (gender === 'enfant') return 'unisex'; // Meta/Google doesn't have a kids value for accessories
   return 'unisex';
 }
 

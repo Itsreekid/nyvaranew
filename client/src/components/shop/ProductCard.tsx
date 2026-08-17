@@ -76,6 +76,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     homme: "Men's",
     femme: "Women's",
     unisex: 'Unisex',
+    enfant: "Kids'",
   };
 
   return (

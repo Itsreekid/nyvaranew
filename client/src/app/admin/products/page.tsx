@@ -481,6 +481,7 @@ export default function AdminProductsPage() {
                 <option value="unisex">Unisexe</option>
                 <option value="homme">Homme</option>
                 <option value="femme">Femme</option>
+                <option value="enfant">Enfant</option>
               </select>
             </div>
             <div className={styles.inputGroup}>

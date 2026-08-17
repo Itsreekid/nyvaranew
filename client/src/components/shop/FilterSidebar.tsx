@@ -18,6 +18,7 @@ const GENDERS: { value: Gender | 'all'; label: string }[] = [
   { value: 'homme',  label: 'Hommes' },
   { value: 'femme',  label: 'Femmes' },
   { value: 'unisex', label: 'Unisexe' },
+  { value: 'enfant', label: 'Enfants' },
 ];
 
 const PRICE_RANGES = [
