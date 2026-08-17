@@ -8,18 +8,50 @@ const TERMINAL_CALL_STATUSES = new Set(['delivered', 'returned']);
 function resolveCallStatus(rawCosmosStatus: string, currentCallStatus: string | null): string {
   const cosmos = rawCosmosStatus?.toLowerCase().trim();
   const current = currentCallStatus || 'pending';
+
+  // ── Determine terminal outcome from Cosmos status ──────────────────────────
   let terminalOutcome: 'delivered' | 'returned' | null = null;
-  if (cosmos === 'delivered') terminalOutcome = 'delivered';
-  else if (['return-stock', 'received-return', 'return-in-transfer'].includes(cosmos)) terminalOutcome = 'returned';
-  const isManualCallCenterState = ['pending', 'attempt_1', 'attempt_2', 'rejected'].includes(current);
-  if (isManualCallCenterState) return terminalOutcome ? terminalOutcome : current;
+
+  if (cosmos === 'delivered') {
+    terminalOutcome = 'delivered';
+  } else if ([
+    'return-stock',
+    'received-return',
+    'return-in-transfer',
+    'final-return',
+    'rejected',   // Cosmos "rejected" = customer refused the package at door → return
+    'refused',    // alternative spelling some APIs use
+  ].includes(cosmos)) {
+    terminalOutcome = 'returned';
+  }
+
+  // ── If current status is still in a call-center manual state, only apply
+  //    terminal outcomes (never let Cosmos override a human decision mid-flow) ─
+  const isManualCallCenterState = [
+    'pending', 'attempt_1', 'attempt_2', 'attempt_3', 'attempt_4', 'attempt_5',
+  ].includes(current);
+
+  if (isManualCallCenterState) {
+    return terminalOutcome ?? current;
+  }
+
+  // ── Order is confirmed / packed / already in logistics flow ───────────────
   if (current === 'confirmed' || current === 'packed') {
     if (terminalOutcome) return terminalOutcome;
-    if (['in-depot', 'in-delivery', 'to-be-verified', 'in-transfer'].includes(cosmos)) return 'packed';
+    // Still in transit → show as packed
+    if (['to-be-picked', 'in-depot', 'in-delivery', 'to-be-verified', 'in-transfer'].includes(cosmos)) return 'packed';
     return current;
   }
-  return terminalOutcome ? terminalOutcome : current;
+
+  // ── Manually rejected by call center — keep unless Cosmos says delivered ──
+  if (current === 'rejected') {
+    return terminalOutcome === 'delivered' ? 'delivered' : current;
+  }
+
+  // ── Any other state (delivered, returned) — terminal, don't change ────────
+  return terminalOutcome ?? current;
 }
+
 
 export async function POST(req: NextRequest) {
   try {

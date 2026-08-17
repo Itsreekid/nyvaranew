@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const offset = page * pageSize;
     const archived = sp.get('archived') === 'true';
     const search = sp.get('search') || '';
+    const status = sp.get('status') || '';
 
     // Build search condition
     let countRows, rows, total;
@@ -24,7 +25,12 @@ export async function GET(request: NextRequest) {
       countRows = await sql`
         SELECT COUNT(*) AS total FROM orders
         WHERE archived = ${archived}
-        AND (customer_name ILIKE ${q} OR phone ILIKE ${q})`;
+        AND (customer_name ILIKE ${q} OR phone ILIKE ${q})
+        AND (
+          ${status} = '' 
+          OR (${status} = 'attempts' AND COALESCE(call_status, 'pending') LIKE 'attempt_%')
+          OR (${status} != 'attempts' AND COALESCE(call_status, 'pending') = ${status})
+        )`;
       total = parseInt(countRows[0]?.total || '0');
 
       rows = await sql`
@@ -49,11 +55,23 @@ export async function GET(request: NextRequest) {
         LEFT JOIN products p ON p.id = oi.product_id
         WHERE o.archived = ${archived}
         AND (o.customer_name ILIKE ${q} OR o.phone ILIKE ${q})
+        AND (
+          ${status} = '' 
+          OR (${status} = 'attempts' AND COALESCE(o.call_status, 'pending') LIKE 'attempt_%')
+          OR (${status} != 'attempts' AND COALESCE(o.call_status, 'pending') = ${status})
+        )
         GROUP BY o.id
         ORDER BY o.created_at DESC
         LIMIT ${pageSize} OFFSET ${offset}`;
     } else {
-      countRows = await sql`SELECT COUNT(*) AS total FROM orders WHERE archived = ${archived}`;
+      countRows = await sql`
+        SELECT COUNT(*) AS total FROM orders 
+        WHERE archived = ${archived}
+        AND (
+          ${status} = '' 
+          OR (${status} = 'attempts' AND COALESCE(call_status, 'pending') LIKE 'attempt_%')
+          OR (${status} != 'attempts' AND COALESCE(call_status, 'pending') = ${status})
+        )`;
       total = parseInt(countRows[0]?.total || '0');
 
       rows = await sql`
@@ -77,6 +95,11 @@ export async function GET(request: NextRequest) {
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN products p ON p.id = oi.product_id
         WHERE o.archived = ${archived}
+        AND (
+          ${status} = '' 
+          OR (${status} = 'attempts' AND COALESCE(o.call_status, 'pending') LIKE 'attempt_%')
+          OR (${status} != 'attempts' AND COALESCE(o.call_status, 'pending') = ${status})
+        )
         GROUP BY o.id
         ORDER BY o.created_at DESC
         LIMIT ${pageSize} OFFSET ${offset}`;

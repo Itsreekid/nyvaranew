@@ -14,7 +14,6 @@ export async function GET() {
              json_build_object('id', c.id, 'name', c.name) AS categories
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
-      WHERE p.stock > 0
       ORDER BY p.created_at DESC`;
 
     const validProducts = (products as any[]).filter(p => p.image_url && (p.price ?? p.final_price ?? 0) > 0);

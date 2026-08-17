@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { ShoppingBag, Archive, ArchiveRestore, CheckSquare, Eye, Truck, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 const OrderDetailsDrawer = dynamic(() => import('@/components/admin/OrderDetailsDrawer'), { ssr: false });
-import StatusDropdown from '@/components/admin/StatusDropdown';
+import StatusDropdown, { CALL_STATUSES } from '@/components/admin/StatusDropdown';
 import type { Order, ColorOption } from '@/types';
 import { showAdminError } from '@/lib/admin-error';
 import { showAdminSuccess } from '@/lib/admin-success';
@@ -83,13 +83,14 @@ export default function AdminOrdersPage() {
   const [pageSize, setPageSize]     = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Search Filter
+  // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState(''); // '' means all
 
-  // Reset page to 0 when search query changes
+  // Reset page to 0 when search or filter changes
   useEffect(() => {
     setPage(0);
-  }, [searchQuery]);
+  }, [searchQuery, statusFilter]);
 
   // ── Confirm & dispatch ─────────────────────────────────────────────────────
   const confirmOrderAndDispatch = async (order: OrderWithItems) => {
@@ -152,6 +153,7 @@ export default function AdminOrdersPage() {
       page: String(page), pageSize: String(pageSize), archived: String(viewArchived),
     });
     if (searchQuery.trim()) _params.set('search', searchQuery.trim());
+    if (statusFilter) _params.set('status', statusFilter);
     const _fetchRes = await fetch('/api/orders?' + _params);
     const _fetchJson = await _fetchRes.json();
     const data = _fetchJson.data;
@@ -228,7 +230,7 @@ export default function AdminOrdersPage() {
     if (count !== null) setTotalCount(count);
     setSelected(new Set());
     setLoading(false);
-  }, [viewArchived, page, pageSize, searchQuery]);
+  }, [viewArchived, page, pageSize, searchQuery, statusFilter]);
 
   // ── Sync active shipments (manual button + on-mount) ──────────────────────
   const syncDeliveryStatus = useCallback(async (silent = false) => {
@@ -330,23 +332,36 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Search Input Filter */}
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Rechercher par nom de client ou téléphone..."
-          className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-nyvara-gold focus:border-nyvara-gold block px-4 py-3 pr-10 shadow-sm"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        {searchQuery && (
-          <button 
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-          >
-            <X size={16} />
-          </button>
-        )}
+      {/* Search & Status Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Rechercher par nom de client ou téléphone..."
+            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-nyvara-gold focus:border-nyvara-gold block px-4 py-3 pr-10 shadow-sm"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-nyvara-gold focus:border-nyvara-gold block px-4 py-3 shadow-sm w-full sm:w-48"
+        >
+          <option value="">Tous les statuts</option>
+          <option value="attempts">🔄 Toutes les tentatives</option>
+          {CALL_STATUSES.filter(s => !s.value.startsWith('attempt_')).map(s => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* ── Tabs & Bulk Actions ── */}
