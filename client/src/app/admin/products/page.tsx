@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Search, X } from 'lucide-react';
 import Image from 'next/image';
 import { uploadImageToR2 } from '@/lib/r2-upload';
 import type { Product, Category, ColorOption, QuantityBreak } from '@/types';
@@ -59,6 +60,26 @@ export default function AdminProductsPage() {
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(0);
+    }, 350);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setPage(0);
+  };
+
   // Modal
   const [modalOpen, setModalOpen]         = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -79,8 +100,9 @@ export default function AdminProductsPage() {
   const fetchAll = useCallback(() => {
     setLoading(true);
     const ts = Date.now();
+    const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '';
     Promise.all([
-      fetch(`/api/products?sort=newest&page=${page}&pageSize=${pageSize}&_t=${ts}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`/api/products?sort=newest&page=${page}&pageSize=${pageSize}${searchParam}&_t=${ts}`, { cache: 'no-store' }).then(r => r.json()),
       fetch(`/api/categories?_t=${ts}`, { cache: 'no-store' }).then(r => r.json()),
     ]).then(([prodsJson, catsJson]) => {
       if (prodsJson.data) setProducts(prodsJson.data as Product[]);
@@ -88,7 +110,7 @@ export default function AdminProductsPage() {
       if (catsJson.data)  setCategories(catsJson.data as Category[]);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [page, pageSize]);
+  }, [page, pageSize, debouncedSearch]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -273,9 +295,112 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Produits</h1>
-        <Button variant="primary" onClick={openAddModal}>+ Ajouter un produit</Button>
+      {/* Mobile: title+button row, then search below. Desktop: single row */}
+      <div className="flex flex-col gap-3">
+        {/* Row 1: Title + Button */}
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Produits</h1>
+          <Button variant="primary" onClick={openAddModal}>+ Ajouter un produit</Button>
+        </div>
+
+        {/* Row 2 on mobile (hidden on sm+), inline on sm+ */}
+        <div className="relative sm:hidden">
+          <Search
+            size={16}
+            style={{
+              position: 'absolute', left: '10px', top: '50%',
+              transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none',
+            }}
+          />
+          <input
+            id="admin-product-search-mobile"
+            type="text"
+            placeholder="Rechercher un produit…"
+            value={searchQuery}
+            onChange={e => handleSearchChange(e.target.value)}
+            style={{
+              paddingLeft: '34px',
+              paddingRight: searchQuery ? '34px' : '12px',
+              paddingTop: '8px',
+              paddingBottom: '8px',
+              fontSize: '14px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              outline: 'none',
+              width: '100%',
+              backgroundColor: '#fff',
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-gold, #b8860b)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(184,134,11,0.12)'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.boxShadow = 'none'; }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              style={{
+                position: 'absolute', right: '8px', top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#6b7280', display: 'flex', alignItems: 'center',
+              }}
+              title="Effacer la recherche"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Desktop: title + search + button in one row */}
+        <div className="hidden sm:flex items-center gap-3">
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search
+              size={16}
+              style={{
+                position: 'absolute', left: '10px', top: '50%',
+                transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none',
+              }}
+            />
+            <input
+              id="admin-product-search"
+              type="text"
+              placeholder="Rechercher un produit…"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+              style={{
+                paddingLeft: '34px',
+                paddingRight: searchQuery ? '34px' : '12px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                fontSize: '14px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                outline: 'none',
+                width: '100%',
+                minWidth: '220px',
+                backgroundColor: '#fff',
+                transition: 'border-color 0.15s, box-shadow 0.15s',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-gold, #b8860b)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(184,134,11,0.12)'; }}
+              onBlur={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.boxShadow = 'none'; }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                style={{
+                  position: 'absolute', right: '8px', top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#6b7280', display: 'flex', alignItems: 'center',
+                }}
+                title="Effacer la recherche"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -339,7 +464,9 @@ export default function AdminProductsPage() {
                 );
               })}
               {products.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">Aucun produit.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  {debouncedSearch ? `Aucun produit trouvé pour « ${debouncedSearch} ».` : 'Aucun produit.'}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -388,7 +515,9 @@ export default function AdminProductsPage() {
             );
           })}
           {products.length === 0 && (
-            <div className="p-8 text-center text-gray-500">Aucun produit.</div>
+            <div className="p-8 text-center text-gray-500">
+              {debouncedSearch ? `Aucun produit trouvé pour « ${debouncedSearch} ».` : 'Aucun produit.'}
+            </div>
           )}
         </div>
 
