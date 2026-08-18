@@ -26,28 +26,31 @@ export type MetaCatalogProduct = Pick<
   custom_label_0?: string | null;
 };
 
-export function formatMetaPrice(price: number): string {
-  return `${price.toFixed(2)} TND`;
+export function formatMetaPrice(price: number | string | null | undefined): string {
+  return `${Number(price ?? 0).toFixed(2)} TND`;
 }
 
 export function isProductOnSale(product: {
-  price: number | null;
-  final_price: number | null;
-  discount?: number | null;
+  price: number | string | null;
+  final_price: number | string | null;
+  discount?: number | string | null;
 }): boolean {
-  if (product.final_price != null && product.price != null && product.final_price < product.price) {
+  const price = Number(product.price ?? 0);
+  const finalPrice = Number(product.final_price ?? 0);
+  if (finalPrice > 0 && price > 0 && finalPrice < price) {
     return true;
   }
-  return (product.discount ?? 0) > 0;
+  return Number(product.discount ?? 0) > 0;
 }
 
 export function getProductPricing(product: {
-  price: number | null;
-  final_price: number | null;
-  discount?: number | null;
+  price: number | string | null;
+  final_price: number | string | null;
+  discount?: number | string | null;
 }): { regularPrice: number; salePrice: number; onSale: boolean } {
-  const regularPrice = product.price ?? product.final_price ?? 0;
-  const salePrice = product.final_price ?? product.price ?? 0;
+  // Neon driver returns NUMERIC columns as strings — coerce to number defensively
+  const regularPrice = Number(product.price ?? product.final_price ?? 0);
+  const salePrice = Number(product.final_price ?? product.price ?? 0);
   const onSale = isProductOnSale(product);
   return { regularPrice, salePrice, onSale };
 }
