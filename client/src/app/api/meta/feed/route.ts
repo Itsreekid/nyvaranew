@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const products = await sql`
       SELECT p.id, p.title, p.description, p.price, p.final_price, p.discount, p.stock, p.image_url,
-             p.gender, p.badge, p.brand, p.google_product_category, p.custom_label_0, p.color_options,
+             p.gender, p.badge, p.custom_label_0, p.color_options,
              p.allow_unlimited_stock,
              json_build_object('id', c.id, 'name', c.name) AS categories
       FROM products p
