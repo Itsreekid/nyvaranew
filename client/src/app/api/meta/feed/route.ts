@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const products = await sql`
-      SELECT id, title, description, price, final_price, discount, stock, image_url,
-             gender, badge, brand, google_product_category, custom_label_0, color_options,
-             allow_unlimited_stock,
+      SELECT p.id, p.title, p.description, p.price, p.final_price, p.discount, p.stock, p.image_url,
+             p.gender, p.badge, p.brand, p.google_product_category, p.custom_label_0, p.color_options,
+             p.allow_unlimited_stock,
              json_build_object('id', c.id, 'name', c.name) AS categories
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
