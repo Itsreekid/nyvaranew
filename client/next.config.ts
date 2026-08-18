@@ -39,17 +39,6 @@ const nextConfig: NextConfig = {
   // HTTP Caching headers
   async headers() {
     return [
-      // ── Meta catalog feed: open to all crawlers (no CSP, no frame restrictions) ──
-      {
-        source: '/api/meta/feed',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=3600, stale-while-revalidate=86400' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' },
-          // Remove X-Frame-Options for this route so Meta crawler is not blocked
-          { key: 'X-Robots-Tag', value: 'noindex' },
-        ],
-      },
       // Products: NEVER cache — pagination and sorting depend on query params
       {
         source: '/api/products',
@@ -77,7 +66,7 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }, // 1 year
         ],
       },
-      // Security headers for all other routes
+      // Security headers for all routes
       {
         source: '/:path*',
         headers: [
@@ -91,6 +80,21 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://vkrgfqjsixjsieqzykcx.supabase.co https://pub-96ecbfcde03642529999eddf062d31f5.r2.dev https://assets.nyvara.com https://*.facebook.com https://*.facebook.net https://*.fbcdn.net; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://vkrgfqjsixjsieqzykcx.supabase.co wss://vkrgfqjsixjsieqzykcx.supabase.co https://pub-96ecbfcde03642529999eddf062d31f5.r2.dev https://*.r2.cloudflarestorage.com https://assets.nyvara.com https://*.facebook.com https://*.facebook.net https://*.fbcdn.net https://*.run.app https://*.on.aws; frame-src 'self' https://*.facebook.com;"
           }
+        ],
+      },
+      // ── Meta catalog feed: MUST come LAST to override the global /:path* security
+      //    headers above. Meta's bot needs open CORS and no COOP/CSP restrictions.
+      {
+        source: '/api/meta/feed',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=3600, stale-while-revalidate=86400' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' },
+          { key: 'X-Robots-Tag', value: 'noindex' },
+          // Override the global security headers that block Meta's crawler
+          { key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' },
+          { key: 'Content-Security-Policy', value: '' },
+          { key: 'X-Frame-Options', value: '' },
         ],
       },
     ];

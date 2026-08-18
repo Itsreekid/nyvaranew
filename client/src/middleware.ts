@@ -48,5 +48,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Exclude static assets, Next.js internals, and public API feeds from middleware.
+  // /api/meta/feed must be reachable by Meta's crawler without auth or cookie logic.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/meta/).*)'],
 };
