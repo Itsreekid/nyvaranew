@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     const noLimit = searchParams.get("noLimit") === "true";
 
     // Count query
-    const countRows = await sql(
+    const countRows = await sql.unsafe(
       `SELECT COUNT(*) as total FROM products p ${whereClause}`,
       params
     );
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       dataParams.push(pageSize, offset);
     }
 
-    const rows = await sql(
+    const rows = await sql.unsafe(
       `SELECT
         p.*,
         json_build_object('id', c.id, 'name', c.name) AS categories

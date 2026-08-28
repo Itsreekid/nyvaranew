@@ -40,7 +40,7 @@ export default async function ProductPage({ params }: Props) {
     ORDER BY p.created_at DESC LIMIT 4`;
 
   const gallery: { id: string; image_url: string }[] = galleryRows as any[];
-  const related: Product[] = relatedRows as Product[];
+  const related: Product[] = relatedRows as unknown as Product[];
 
   return <ProductDetail product={product as Product} gallery={gallery} related={related} />;
 }

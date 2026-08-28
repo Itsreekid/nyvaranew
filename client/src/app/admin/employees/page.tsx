@@ -45,7 +45,7 @@ export default function EmployeesPage() {
   const loadUsers = useCallback(async () => {
     setLoading(true);
     const result = await getEmployeesAction();
-    if (result.data) setUsers(result.data as AdminUser[]);
+    if ('data' in result) setUsers(result.data as unknown as AdminUser[]);
     setLoading(false);
   }, []);
 

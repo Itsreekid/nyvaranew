@@ -235,7 +235,7 @@ export async function PATCH(request: NextRequest) {
     if (!updates.length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
     params.push(id);
-    await sql(`UPDATE orders SET ${updates.join(', ')} WHERE id = $${pi}`, params);
+    await sql.unsafe(`UPDATE orders SET ${updates.join(', ')} WHERE id = $${pi}`, params);
     return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json({ error: (err as any).message }, { status: 500 });

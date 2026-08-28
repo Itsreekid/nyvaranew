@@ -48,7 +48,7 @@ export function getProductPricing(product: {
   final_price: number | string | null;
   discount?: number | string | null;
 }): { regularPrice: number; salePrice: number; onSale: boolean } {
-  // Neon driver returns NUMERIC columns as strings — coerce to number defensively
+  // postgres.js returns NUMERIC columns as strings — coerce to number defensively
   const regularPrice = Number(product.price ?? product.final_price ?? 0);
   const salePrice = Number(product.final_price ?? product.price ?? 0);
   const onSale = isProductOnSale(product);
