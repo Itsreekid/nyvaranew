@@ -15,16 +15,24 @@ export default function AdminCategoriesPage() {
   const [editName, setEditName]     = useState('');
 
   const fetchCategories = async () => {
+    console.log('[categories] 🔄 fetching /api/categories...');
     try {
       const res = await fetch('/api/categories');
+      console.log('[categories] 📡 status:', res.status, res.statusText);
+
       const json = await res.json();
+      console.log('[categories] 📦 raw response:', json);
+
       if (!res.ok) throw new Error(json.error || `Erreur HTTP ${res.status}`);
+
+      console.log('[categories] ✅ data received, count:', Array.isArray(json.data) ? json.data.length : 'NOT an array', json.data);
       setCategories(Array.isArray(json.data) ? json.data : []);
     } catch (err: any) {
-      console.error('[categories] fetch error:', err);
+      console.error('[categories] ❌ error:', err.message, err);
       showAdminError(err.message || 'Impossible de charger les catégories.');
     } finally {
       setLoading(false);
+      console.log('[categories] 🏁 done loading');
     }
   };
 

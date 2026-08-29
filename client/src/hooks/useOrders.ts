@@ -9,10 +9,25 @@ export function useCategories() {
   const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
-    fetch('/api/categories')
-      .then(r => r.json())
-      .then(({ data }) => { setCategories(data ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+    const run = async () => {
+      console.log('[useCategories] 🔄 fetching /api/categories...');
+      try {
+        const res = await fetch('/api/categories');
+        console.log('[useCategories] 📡 status:', res.status, res.statusText);
+        const json = await res.json();
+        console.log('[useCategories] 📦 raw response:', json);
+        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        const arr = Array.isArray(json.data) ? json.data : [];
+        console.log('[useCategories] ✅ count:', arr.length, arr);
+        setCategories(arr);
+      } catch (err: any) {
+        console.error('[useCategories] ❌ error:', err.message, err);
+      } finally {
+        setLoading(false);
+        console.log('[useCategories] 🏁 done');
+      }
+    };
+    run();
   }, []);
 
   return { categories, loading };
