@@ -32,15 +32,25 @@ export default async function ProductPage({ params }: Props) {
   const product = productRows[0] as any;
   if (!product) notFound();
 
-  // Ensure color_options is always a parsed array, never a raw JSON string.
-  // PostgreSQL drivers can return JSONB columns as a stringified value.
-  if (typeof product.color_options === 'string') {
-    try { product.color_options = JSON.parse(product.color_options); }
-    catch { product.color_options = []; }
-  }
-  if (!Array.isArray(product.color_options)) {
-    product.color_options = [];
-  }
+  // Ensure JSONB columns are parsed properly, since PostgreSQL drivers can return them as strings.
+  const parseJsonbArray = (val: any) => {
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch { return []; }
+    }
+    return Array.isArray(val) ? val : [];
+  };
+
+  const parseJsonbObject = (val: any) => {
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch { return {}; }
+    }
+    return typeof val === 'object' && !Array.isArray(val) && val !== null ? val : {};
+  };
+
+  product.color_options = parseJsonbArray(product.color_options);
+  product.quantity_breaks = parseJsonbArray(product.quantity_breaks);
+  product.ideal_faces = parseJsonbArray(product.ideal_faces);
+  product.specs = parseJsonbObject(product.specs);
 
   const relatedRows = await sql`
     SELECT p.*, json_build_object('id', c.id, 'name', c.name) AS categories
