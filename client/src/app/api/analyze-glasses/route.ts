@@ -1,8 +1,8 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// google/gemini-flash-1.5 — free-tier vision model that supports image input
-const MODEL = 'google/gemini-flash-1.5';
+// google/gemini-2.0-flash-001 — stable vision model on OpenRouter
+const MODEL = 'google/gemini-2.0-flash-001';
 const FALLBACK_MODEL = 'meta-llama/llama-3.2-11b-vision-instruct:free';
 
 const SYSTEM_PROMPT = `You are an expert optical stylist and senior e-commerce copywriter for Nyvara, a premium Tunisian eyewear brand. Analyze the provided glasses frame image and return STRICT valid JSON — no Markdown fences, no extra keys, no commentary outside the JSON object.
