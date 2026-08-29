@@ -117,10 +117,24 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   // For the gallery, we'll track the last selected color to know which image to show
   const [lastSelectedColor, setLastSelectedColor] = useState<ColorOption | null>(null);
 
+  const parseColorOptions = (options: any): ColorOption[] => {
+    if (!options) return [];
+    if (typeof options === 'string') {
+      try {
+        return JSON.parse(options);
+      } catch (e) {
+        return [];
+      }
+    }
+    return Array.isArray(options) ? options : [];
+  };
+
+  const safeColorOptions = parseColorOptions(product.color_options);
+
   // Build one flat list: primary → all color images → extra gallery
   const allImages: string[] = [
     ...(product.image_url ? [product.image_url] : []),
-    ...(product.color_options ?? []).flatMap(co => [
+    ...safeColorOptions.flatMap(co => [
       ...(co.image_url ? [co.image_url] : []),
       ...(co.image_url2 ? [co.image_url2] : []),
     ]),
@@ -130,7 +144,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   // Map color id → index of its first image in allImages (for jumping on swatch click)
   const colorImageIndex: Record<string, number> = {};
   let imgIdx = product.image_url ? 1 : 0;
-  for (const co of product.color_options ?? []) {
+  for (const co of safeColorOptions) {
     if (co.image_url) { colorImageIndex[co.id] = imgIdx; imgIdx++; }
     if (co.image_url2) imgIdx++;
   }
@@ -172,8 +186,8 @@ export default function ProductDetail({ product, gallery, related }: Props) {
     setAutoPlayStopped(true);
 
     const clickedSrc = allImages[idx];
-    if (clickedSrc && product.color_options && product.color_options.length > 0) {
-      const matchedColor = product.color_options.find(
+    if (clickedSrc && safeColorOptions.length > 0) {
+      const matchedColor = safeColorOptions.find(
         co => co.image_url === clickedSrc || co.image_url2 === clickedSrc
       );
       if (matchedColor && selectedColors[0]?.id !== matchedColor.id) {
@@ -186,7 +200,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   };
 
   const validateColors = (): boolean => {
-    if (product.color_options && product.color_options.length > 0) {
+    if (safeColorOptions.length > 0) {
       const hasMissingColor = selectedColors.some(c => c === null);
       if (hasMissingColor || selectedColors.length === 0) {
         setToastMessage('Veuillez choisir une couleur pour continuer');
@@ -357,7 +371,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             )}
 
             {/* Color Selector — Mobile Only */}
-            {qty === 1 && product.color_options && product.color_options.length > 0 && (
+            {qty === 1 && safeColorOptions.length > 0 && (
               <div className={`${styles.colorSelector} ${styles.mobileColorSelector}`}>
                 <p className={styles.colorLabel} style={{ textAlign: 'center', marginBottom: '12px', fontSize: '15px' }}>Couleur : <strong>{selectedColors[0]?.name || 'Veuillez choisir'}</strong></p>
                 <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ justifyContent: 'center', position: 'relative' }}>
@@ -366,7 +380,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                       Veuillez choisir une couleur pour continuer
                     </div>
                   )}
-                  {product.color_options.map(co => (
+                  {safeColorOptions.map(co => (
                     <button
                       key={co.id}
                       disabled={co.isAvailable === false}
@@ -486,13 +500,13 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                         <span className={styles.qbreakTotal}>{formatTND(qb.total_price)}</span>
                         
                         {/* Multi-color selection INSIDE the card when active */}
-                        {qty === qb.min_qty && product.color_options && (
+                        {qty === qb.min_qty && safeColorOptions.length > 0 && (
                           <div className={styles.qbreakColors}>
                             {Array.from({ length: qb.min_qty }).map((_, uIdx) => (
                               <div key={uIdx} className={styles.qbreakColorRow}>
                                 <span className={styles.qbreakColorLabel}>Paire {uIdx + 1} :</span>
                                 <div className={styles.colorListSmall}>
-                                  {product.color_options?.map(co => (
+                                  {safeColorOptions.map(co => (
                                     <button
                                       key={co.id}
                                       type="button"
@@ -526,7 +540,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             )}
 
             {/* Selection des couleurs après l'offre — Desktop Only */}
-            {qty === 1 && product.color_options && product.color_options.length > 0 && (
+            {qty === 1 && safeColorOptions.length > 0 && (
               <div className={`${styles.colorSelector} ${styles.desktopColorSelector}`}>
                 <p className={styles.colorLabel}>Couleur : <strong>{selectedColors[0]?.name || 'Veuillez choisir'}</strong></p>
                 <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ position: 'relative' }}>
@@ -535,7 +549,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                       Veuillez choisir une couleur pour continuer
                     </div>
                   )}
-                  {product.color_options.map(co => (
+                  {safeColorOptions.map(co => (
                     <button
                       key={co.id}
                       disabled={co.isAvailable === false}
