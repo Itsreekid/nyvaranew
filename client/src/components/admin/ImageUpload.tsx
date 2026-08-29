@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useRef } from 'react';
 import Image from 'next/image';
@@ -10,6 +10,8 @@ interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
   onUploading: (isUploading: boolean) => void;
+  /** Optional: called with the raw File immediately on selection (before R2 upload). Use for AI analysis. */
+  onFileSelected?: (file: File) => void;
   folder?: 'products' | 'gallery' | 'colors';
 }
 
@@ -19,6 +21,7 @@ export default function ImageUpload({
   value,
   onChange,
   onUploading,
+  onFileSelected,
   folder = 'products',
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -54,11 +57,17 @@ export default function ImageUpload({
 
   const uploadFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setErrorMessage('Veuillez sélectionner une image valide.');
+      setErrorMessage('Veuillez selectionner une image valide.');
       return;
     }
 
     setErrorMessage('');
+
+    // Fire AI analysis hook immediately — non-blocking, runs in parallel with R2 upload
+    if (onFileSelected) {
+      try { onFileSelected(file); } catch { /* silent — never block the upload */ }
+    }
+
     onUploading(true);
     setPhase('uploading');
 
@@ -86,7 +95,7 @@ export default function ImageUpload({
       <div className={styles.previewContainer}>
         <Image
           src={value}
-          alt="Aperçu"
+          alt="Apercu"
           width={200}
           height={200}
           className={styles.previewImage}
