@@ -14,14 +14,18 @@ export default function AdminCategoriesPage() {
   const [editId, setEditId]         = useState<string | null>(null);
   const [editName, setEditName]     = useState('');
 
-  const fetchCategories = () => {
-    fetch('/api/categories')
-      .then(r => r.json())
-      .then(({ data }) => {
-        if (data) setCategories(data as Category[]);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `Erreur HTTP ${res.status}`);
+      setCategories(Array.isArray(json.data) ? json.data : []);
+    } catch (err: any) {
+      console.error('[categories] fetch error:', err);
+      showAdminError(err.message || 'Impossible de charger les catégories.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchCategories(); }, []);
@@ -47,6 +51,7 @@ export default function AdminCategoriesPage() {
 
   const handleDelete = async (id: string, name: string | null) => {
     if (!confirm(`Supprimer la catégorie "${name}" ? Les produits liés ne seront pas supprimés.`)) return;
+    await fetch(`/api/categories/${id}`, { method: 'DELETE' });
     fetchCategories();
   };
 
