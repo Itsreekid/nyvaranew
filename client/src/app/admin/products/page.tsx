@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
@@ -55,6 +55,22 @@ interface SpecRow { key: string; value: string; }
 interface GalleryImage { id: string; image_url: string; sort_order: number; }
 
 export default function AdminProductsPage() {
+  // Safely parse JSONB fields that PostgreSQL drivers can return as strings
+  const parseJsonArray = <T,>(val: unknown, fallback: T[] = []): T[] => {
+    if (!val) return fallback;
+    if (typeof val === 'string') {
+      try { return JSON.parse(val) as T[]; } catch { return fallback; }
+    }
+    return Array.isArray(val) ? (val as T[]) : fallback;
+  };
+
+  const parseJsonObject = (val: unknown): Record<string, string> => {
+    if (!val) return {};
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch { return {}; }
+    }
+    return typeof val === 'object' && !Array.isArray(val) ? (val as Record<string, string>) : {};
+  };
   const [products, setProducts]     = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -168,17 +184,17 @@ export default function AdminProductsPage() {
       frame_shape:  (p as any).frame_shape  ?? '',
       style_vibe:   (p as any).style_vibe   ?? '',
       optical_fit:  (p as any).optical_fit  ?? '',
-      ideal_faces:  (p as any).ideal_faces  ?? [],
+      ideal_faces:  parseJsonArray<string>((p as any).ideal_faces),
     });
     // Specs rows
-    const specs = (p.specs ?? {}) as Record<string, string>;
+    const specs = parseJsonObject(p.specs);
     setSpecRows(Object.entries(specs).map(([key, value]) => ({ key, value })));
     // Load gallery images for this product
     const galleryRes = await fetch(`/api/products/${p.id}/images`);
     const galleryJson = await galleryRes.json();
     setGalleryImages((galleryJson.data as GalleryImage[]) ?? []);
-    setColorOptions(p.color_options ?? []);
-    setQuantityBreaks(p.quantity_breaks ?? []);
+    setColorOptions(parseJsonArray<ColorOption>(p.color_options));
+    setQuantityBreaks(parseJsonArray<QuantityBreak>(p.quantity_breaks));
     setModalOpen(true);
   };
 
