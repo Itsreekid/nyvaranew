@@ -81,7 +81,7 @@ export default function OrderDetailsDrawer({
   React.useEffect(() => {
     if (activeTab === 'history' && order?.phone) {
       setHistoryLoading(true);
-      fetch('/api/orders?noLimit=true').then(r=>r.json()).then(({data})=>{
+      fetch(`/api/orders?search=${encodeURIComponent(order.phone)}&limit=100`).then(r=>r.json()).then(({data})=>{
           const filtered = (data||[]).filter((o: any) => o.phone === order.phone && o.id !== order.id);
           setHistoryOrders(filtered);
           setHistoryLoading(false);
