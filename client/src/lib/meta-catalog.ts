@@ -70,7 +70,19 @@ export function collectAdditionalImageUrls(
     additional.push(normalized);
   };
 
-  for (const co of product.color_options ?? []) {
+  let colorOptions = product.color_options;
+  if (typeof colorOptions === 'string') {
+    try {
+      colorOptions = JSON.parse(colorOptions);
+    } catch {
+      colorOptions = [];
+    }
+  }
+  if (!Array.isArray(colorOptions)) {
+    colorOptions = [];
+  }
+
+  for (const co of colorOptions) {
     add(co.image_url);
     add(co.image_url2);
   }

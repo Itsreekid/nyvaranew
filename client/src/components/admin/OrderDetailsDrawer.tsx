@@ -37,8 +37,22 @@ function getUnitPrice(item: OrderItem): number {
   return item.products?.price ?? 0;
 }
 
+function getColorOptions(item: OrderItem): ColorOption[] {
+  const opts = item.products?.color_options;
+  if (Array.isArray(opts)) return opts;
+  if (typeof opts === 'string') {
+    try {
+      const parsed = JSON.parse(opts);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function findColor(item: OrderItem): ColorOption | undefined {
-  return item.products?.color_options?.find(
+  return getColorOptions(item).find(
     (co: ColorOption) => 
       (item.selected_color_name && co.name === item.selected_color_name) ||
       (item.selected_color_hex1 && co.hex1 === item.selected_color_hex1)
@@ -422,7 +436,7 @@ export default function OrderDetailsDrawer({
 
                       <td style={{ position: 'relative' }}>
                         {isEditing ? (() => {
-                          const colors   = item.products?.color_options ?? [];
+                          const colors   = getColorOptions(item);
                           const editItem = item as EditableItem;
                           const selected = colors.find(co => 
                             (editItem.selected_color_name && co.name === editItem.selected_color_name) ||
