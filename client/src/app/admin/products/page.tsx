@@ -371,10 +371,11 @@ export default function AdminProductsPage() {
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
 
         try {
+          const catName = categories.find(c => c.id === formData.category_id)?.name || 'Produit général';
           const res = await fetch('/api/analyze-glasses', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageBase64: compressedBase64 }),
+            body: JSON.stringify({ imageBase64: compressedBase64, categoryName: catName }),
           });
           const json = await res.json();
           if (!json.success || !json.data) {
@@ -477,7 +478,8 @@ export default function AdminProductsPage() {
         ctx.drawImage(img, 0, 0, width, height);
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
         try {
-          const res = await fetch('/api/analyze-glasses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64: compressedBase64 }) });
+          const catName = categories.find(c => c.id === formData.category_id)?.name || 'Produit général';
+          const res = await fetch('/api/analyze-glasses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64: compressedBase64, categoryName: catName }) });
           const json = await res.json();
           if (!json.success || !json.data?.color_analysis) { clearInterval(progressInterval); setAnalyzingColorIndex(null); setVariantAiProgress(null); return; }
           const ca = json.data.color_analysis;
