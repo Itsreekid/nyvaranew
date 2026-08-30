@@ -176,6 +176,7 @@ export default function EmployeesPage() {
                 placeholder="Ex: salma"
                 value={form.username}
                 onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                autoComplete="off"
                 required
               />
             </div>
@@ -187,6 +188,7 @@ export default function EmployeesPage() {
                 placeholder="Mot de passe sécurisé"
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                autoComplete="new-password"
                 required
               />
             </div>
