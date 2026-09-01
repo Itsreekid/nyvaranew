@@ -13,6 +13,9 @@ export async function generateProductEmbedding(product: Partial<Product>): Promi
     product.description || '',
     product.features || '',
     product.gender ? `Gender: ${product.gender}` : '',
+    product.frame_shape ? `Frame Shape: ${product.frame_shape}` : '',
+    product.style_vibe ? `Style: ${product.style_vibe}` : '',
+    product.ideal_faces && Array.isArray(product.ideal_faces) ? `Ideal Faces: ${product.ideal_faces.join(', ')}` : '',
   ];
 
   if (product.specs) {

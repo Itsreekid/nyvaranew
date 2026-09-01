@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// google/gemini-2.5-flash — multimodal vision model available on OpenRouter
-const MODEL = 'google/gemini-2.5-flash';
-const FALLBACK_MODEL = 'google/gemini-2.5-flash-lite';
+// google/gemini-2.5-flash:free — multimodal vision model available on OpenRouter for free
+const MODEL = 'google/gemini-2.5-flash:free';
+const FALLBACK_MODEL = 'google/gemini-2.5-flash:free';
 
 const buildSystemPrompt = (categoryName: string) => {
   const isGlasses = categoryName.toLowerCase().includes('lunettes') || categoryName.toLowerCase().includes('solaire');

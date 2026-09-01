@@ -108,7 +108,8 @@ export async function POST(request: NextRequest) {
     const {
       title, price, final_price, cost_price, stock, discount, description,
       image_url, gender, category_id, badge, features, rating, review_count,
-      specs, color_options, quantity_breaks, is_active, allow_unlimited_stock
+      specs, color_options, quantity_breaks, is_active, allow_unlimited_stock,
+      frame_shape, style_vibe, optical_fit, ideal_faces
     } = body;
 
     // Generate vector embedding
@@ -119,7 +120,8 @@ export async function POST(request: NextRequest) {
       INSERT INTO products
         (title, price, final_price, cost_price, stock, discount, description,
          image_url, gender, category_id, badge, features, rating, review_count,
-         specs, color_options, quantity_breaks, is_active, allow_unlimited_stock, embedding)
+         specs, color_options, quantity_breaks, is_active, allow_unlimited_stock,
+         frame_shape, style_vibe, optical_fit, ideal_faces, embedding)
       VALUES
         (${title}, ${price}, ${final_price ?? null}, ${cost_price ?? null},
          ${stock ?? 0}, ${discount ?? null}, ${description ?? null},
@@ -130,6 +132,8 @@ export async function POST(request: NextRequest) {
          ${color_options ? JSON.stringify(color_options) : null},
          ${quantity_breaks ? JSON.stringify(quantity_breaks) : null},
          ${is_active ?? true}, ${allow_unlimited_stock ?? false},
+         ${frame_shape ?? null}, ${style_vibe ?? null}, ${optical_fit ?? null},
+         ${ideal_faces ? JSON.stringify(ideal_faces) : null},
          ${embeddingStr})
       RETURNING *
     `;
