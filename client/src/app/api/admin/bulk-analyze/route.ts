@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'google/gemini-2.5-flash:free';
+const MODEL = 'google/gemini-2.5-flash';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

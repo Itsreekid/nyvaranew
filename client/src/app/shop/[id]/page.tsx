@@ -81,6 +81,18 @@ export default async function ProductPage({ params }: Props) {
       // Match 5: Same Optical Fit (+1)
       if (product.optical_fit && p.optical_fit === product.optical_fit) score += 1;
 
+      // Match 6: Color Matching (+2) - check if any color names overlap
+      try {
+        const productColors = product.color_options || [];
+        const pColors = typeof p.color_options === 'string' ? JSON.parse(p.color_options) : (p.color_options || []);
+        
+        const productcolorNames = productColors.map((c: any) => c?.name?.toLowerCase()).filter(Boolean);
+        const pColorNames = pColors.map((c: any) => c?.name?.toLowerCase()).filter(Boolean);
+        
+        const hasMatchingColor = productcolorNames.some((cName: string) => pColorNames.includes(cName));
+        if (hasMatchingColor) score += 2;
+      } catch(e) {}
+
       return { product: p, score };
     });
 
