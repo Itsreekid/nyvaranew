@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// google/gemini-2.5-flash — multimodal vision model available on OpenRouter
-const MODEL = 'google/gemini-2.5-flash';
-const FALLBACK_MODEL = 'google/gemini-2.5-flash-lite';
+const GOOGLE_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
 
 const buildSystemPrompt = (categoryName: string) => {
   const isGlasses = categoryName.toLowerCase().includes('lunettes') || categoryName.toLowerCase().includes('solaire');
@@ -65,9 +62,10 @@ ${isGlasses ? `- frame_shape: MUST BE ONE OF: Rond Classique | Aviateur | Oeil-d
 };
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  // Use free Google AI key from Coolify Environment Variables
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ success: false, error: 'OpenRouter API key is missing' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Google API key is missing' }, { status: 500 });
   }
 
   let imageBase64: string | undefined;
@@ -88,74 +86,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'No imageBase64 or imageUrl provided.' }, { status: 400 });
   }
 
-  const imageContent = imageBase64
-    ? { type: 'image_url', image_url: { url: imageBase64 } }
-    : { type: 'image_url', image_url: { url: imageUrl } };
+  try {
+    // If we only have URL, fetch it and convert to base64 for Google API
+    if (imageUrl && !imageBase64) {
+      const imgRes = await fetch(imageUrl);
+      const arrayBuffer = await imgRes.arrayBuffer();
+      imageBase64 = Buffer.from(arrayBuffer).toString('base64');
+    }
 
-  const systemPrompt = buildSystemPrompt(categoryName);
+    // Google API expects raw base64 string without data:image/png;base64 prefix
+    const rawBase64 = imageBase64!.replace(/^data:image\/\w+;base64,/, '');
 
-  const tryWithModel = async (model: string) => {
-    return await fetch(OPENROUTER_URL, {
+    const systemPrompt = buildSystemPrompt(categoryName);
+
+    const res = await fetch(GOOGLE_API_URL + apiKey, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://nyvara.tn',
-        'X-Title': 'Nyvara Admin Panel',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: 2000,
-        messages: [
-          { role: 'system', content: [{ type: 'text', text: systemPrompt }] },
-          { role: 'user', content: [imageContent] },
-        ],
-      }),
+        generationConfig: {
+          responseMimeType: 'application/json'
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: systemPrompt },
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: rawBase64
+                }
+              }
+            ]
+          }
+        ]
+      })
     });
-  };
 
-  try {
-    let orRes = await tryWithModel(MODEL);
-
-    if (!orRes.ok) {
-      console.warn(`[analyze-glasses] Primary model ${MODEL} failed (${orRes.status}), trying fallback...`);
-      orRes = await tryWithModel(FALLBACK_MODEL);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[analyze-glasses] Google API Error:', res.status, errText);
+      return NextResponse.json({ success: false, error: `Google API Error ${res.status}: ${errText}` }, { status: 500 });
     }
 
-    if (!orRes.ok) {
-      const errText = await orRes.text();
-      console.error('[analyze-glasses] Both models failed:', orRes.status, errText);
-      return NextResponse.json(
-        { success: false, error: `AI service returned ${orRes.status}. Please try again.` },
-        { status: 502 }
-      );
-    }
+    const data = await res.json();
+    let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // Fallback cleanup just in case
+    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    const orData = await orRes.json();
-    const rawContent: string = orData?.choices?.[0]?.message?.content ?? '';
-
-    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-    const jsonString = jsonMatch ? jsonMatch[0] : rawContent;
-
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(jsonString);
-    } catch (parseErr) {
-      console.error('[analyze-glasses] JSON parse error:', parseErr, '\nRaw:', rawContent.slice(0, 500));
-      return NextResponse.json(
-        { success: false, error: 'AI returned malformed JSON. Try uploading the image again.' },
-        { status: 500 }
-      );
-    }
-
+    const parsed = JSON.parse(content);
     return NextResponse.json({ success: true, data: parsed });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[analyze-glasses] Unexpected error:', message);
-    return NextResponse.json(
-      { success: false, error: `Internal server error: ${message}` },
-      { status: 500 }
-    );
+
+  } catch (error: any) {
+    console.error('[analyze-glasses] Exception:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

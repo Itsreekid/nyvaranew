@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'google/gemini-2.5-flash';
+const GOOGLE_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,9 +11,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: 'OpenRouter API key missing' }, { status: 500 });
+    return NextResponse.json({ error: 'Google API key missing from environment variables' }, { status: 500 });
   }
 
   try {
@@ -40,6 +39,17 @@ export async function GET(request: Request) {
         continue;
       }
 
+      let rawBase64 = '';
+      try {
+        const imgRes = await fetch(product.image_url);
+        const arrayBuffer = await imgRes.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+      } catch (err: any) {
+        errors.push(`Product ${product.id} image fetch failed: ${err.message}`);
+        continue;
+      }
+
       const prompt = `You are a fashion AI. Analyze this product image. Return STRICT JSON.
       {
         "frame_shape": "Rond Classique | Aviateur | Oeil-de-chat | Carree | Rectangulaire | Geometrique",
@@ -49,22 +59,25 @@ export async function GET(request: Request) {
       }
       ONLY return the JSON object. No Markdown.`;
 
-      const res = await fetch(OPENROUTER_URL, {
+      const res = await fetch(GOOGLE_API_URL + apiKey, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://nyvara.net',
-          'X-Title': 'Nyvara Admin Bulk',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: MODEL,
-          response_format: { type: 'json_object' },
-          messages: [{
+          generationConfig: {
+            responseMimeType: 'application/json'
+          },
+          contents: [{
             role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: product.image_url } }
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: rawBase64
+                }
+              }
             ]
           }]
         })
@@ -72,7 +85,7 @@ export async function GET(request: Request) {
 
       if (res.ok) {
         const data = await res.json();
-        let content = data.choices?.[0]?.message?.content || '';
+        let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         content = content.replace(/```json/g, '').replace(/```/g, '').trim();
         
         try {
@@ -93,7 +106,7 @@ export async function GET(request: Request) {
         }
       } else {
         const errText = await res.text();
-        errors.push(`Product ${product.id} OpenRouter Error ${res.status}: ${errText}`);
+        errors.push(`Product ${product.id} Google API Error ${res.status}: ${errText}`);
       }
       
       // small delay to prevent rate limiting
