@@ -52,45 +52,56 @@ export default async function ProductPage({ params }: Props) {
   product.ideal_faces = parseJsonbArray(product.ideal_faces);
   product.specs = parseJsonbObject(product.specs);
 
-  const allProducts = await sql`
-    SELECT p.*, json_build_object('id', c.id, 'name', c.name) AS categories
-    FROM products p LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.id != ${id}::uuid
-      AND p.embedding IS NOT NULL
-      AND p.is_active = true
-  `;
-
-  let relatedRows = [];
+  let relatedRows: any[] = [];
   
-  if (product.embedding && allProducts.length > 0) {
-    const targetEmbedding = parseJsonbArray(product.embedding) as number[];
-    
-    // Calculate cosine similarity
-    const cosineSimilarity = (a: number[], b: number[]) => {
-      if (a.length !== b.length) return 0;
-      let dotProduct = 0;
-      let normA = 0;
-      let normB = 0;
-      for (let i = 0; i < a.length; i++) {
-        dotProduct += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
-      }
-      if (normA === 0 || normB === 0) return 0;
-      return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    };
+  if (product.embedding) {
+    // If the current product has an embedding, use AI similarity
+    const allProducts = await sql`
+      SELECT p.*, json_build_object('id', c.id, 'name', c.name) AS categories
+      FROM products p LEFT JOIN categories c ON c.id = p.category_id
+      WHERE p.id != ${id}::uuid
+        AND p.embedding IS NOT NULL
+        AND p.is_active = true
+    `;
 
-    const scoredProducts = allProducts.map(p => {
-      const emb = parseJsonbArray(p.embedding) as number[];
-      const score = cosineSimilarity(targetEmbedding, emb);
-      return { product: p, score };
-    });
+    if (allProducts.length > 0) {
+      const targetEmbedding = parseJsonbArray(product.embedding) as number[];
+      
+      const cosineSimilarity = (a: number[], b: number[]) => {
+        if (a.length !== b.length) return 0;
+        let dotProduct = 0, normA = 0, normB = 0;
+        for (let i = 0; i < a.length; i++) {
+          dotProduct += a[i] * b[i];
+          normA += a[i] * a[i];
+          normB += b[i] * b[i];
+        }
+        if (normA === 0 || normB === 0) return 0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+      };
 
-    scoredProducts.sort((a, b) => b.score - a.score);
-    relatedRows = scoredProducts.slice(0, 4).map(s => s.product);
-  } else {
-    // Fallback if no embedding
-    relatedRows = allProducts.slice(0, 4);
+      const scoredProducts = allProducts.map(p => {
+        const emb = parseJsonbArray(p.embedding) as number[];
+        const score = cosineSimilarity(targetEmbedding, emb);
+        return { product: p, score };
+      });
+
+      scoredProducts.sort((a, b) => b.score - a.score);
+      relatedRows = scoredProducts.slice(0, 4).map(s => s.product);
+    }
+  }
+
+  // Fallback: If AI related products couldn't be loaded (e.g. migration incomplete)
+  if (relatedRows.length === 0) {
+    const fallbackRows = await sql`
+      SELECT p.*, json_build_object('id', c.id, 'name', c.name) AS categories
+      FROM products p LEFT JOIN categories c ON c.id = p.category_id
+      WHERE p.category_id = ${product.category_id ?? '00000000-0000-0000-0000-000000000000'}::uuid
+        AND p.id != ${id}::uuid
+        AND p.is_active = true
+      ORDER BY p.created_at DESC
+      LIMIT 4
+    `;
+    relatedRows = fallbackRows as any[];
   }
 
   const gallery: { id: string; image_url: string }[] = galleryRows as any[];
