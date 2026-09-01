@@ -14,8 +14,8 @@ type GroupedProduct = {
   totalQuantity: number;
   items: {
     orderId: string;
-    customerName: string;
-    phone: string;
+    customerName: string | null;
+    phone: string | null;
     quantity: number;
     colorName: string | null;
     colorHex1: string | null;
