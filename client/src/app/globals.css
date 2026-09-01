@@ -58,6 +58,23 @@ a  { color: inherit; text-decoration: none; }
 button { cursor: pointer; border: none; background: none; font-family: inherit; }
 input, textarea, select { font-family: inherit; }
 
+/* ─── Arabic Overrides ──────────────────────────────────────── */
+html[lang="ar"] body,
+html[lang="ar"] input,
+html[lang="ar"] textarea,
+html[lang="ar"] select,
+html[lang="ar"] button {
+  font-family: var(--font-cairo), sans-serif;
+  letter-spacing: 0;
+}
+html[lang="ar"] .editorial {
+  font-family: var(--font-cairo), sans-serif;
+}
+html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4 {
+  font-family: var(--font-cairo), sans-serif;
+  font-weight: 700;
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-cream-dark); }

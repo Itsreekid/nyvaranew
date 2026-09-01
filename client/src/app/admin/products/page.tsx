@@ -392,9 +392,6 @@ export default function AdminProductsPage() {
           setFormData(prev => {
             const next = { ...prev };
             if (d.name_suggestions?.[0]) { next.title = d.name_suggestions[0]; filled.add('title'); }
-            if (d.price_original != null) { next.price = String(d.price_original); filled.add('price'); }
-            if (d.price_discounted != null) { next.final_price = String(d.price_discounted); filled.add('final_price'); }
-            if (d.cost_price != null) { next.cost_price = String(d.cost_price); filled.add('cost_price'); }
             if (d.stock_initial != null) { next.stock = String(d.stock_initial); filled.add('stock'); }
             if (d.gender && ['unisex', 'homme', 'femme'].includes(d.gender)) { next.gender = d.gender; filled.add('gender'); }
             if (d.promo_badge) { next.badge = d.promo_badge; filled.add('badge'); }
@@ -426,17 +423,6 @@ export default function AdminProductsPage() {
               isAvailable: true,
             }]);
             filled.add('color_options');
-          }
-
-          // Auto-select category based on product_type
-          if (d.product_type) {
-            setCategories(prev => {
-              const match = d.product_type === 'lunettes_vue'
-                ? prev.find(c => c.name?.toLowerCase().includes('vue'))
-                : prev.find(c => c.name?.toLowerCase().includes('solaire'));
-              if (match) setFormData(f => ({ ...f, category_id: match.id }));
-              return prev;
-            });
           }
 
           setAiFilledFields(filled);

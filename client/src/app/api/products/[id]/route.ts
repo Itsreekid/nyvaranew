@@ -19,10 +19,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
+import { generateProductEmbedding } from '@/lib/embeddings';
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const b = await req.json();
+
+    const embedding = await generateProductEmbedding(b);
+    const embeddingStr = embedding ? JSON.stringify(embedding) : null;
+
     const rows = await sql`
       UPDATE products SET
         title = ${b.title}, price = ${b.price}, final_price = ${b.final_price ?? null},
@@ -36,7 +42,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         color_options = ${b.color_options ? JSON.stringify(b.color_options) : null},
         quantity_breaks = ${b.quantity_breaks ? JSON.stringify(b.quantity_breaks) : null},
         is_active = ${b.is_active ?? true},
-        allow_unlimited_stock = ${b.allow_unlimited_stock ?? false}
+        allow_unlimited_stock = ${b.allow_unlimited_stock ?? false},
+        embedding = COALESCE(${embeddingStr}, embedding)
       WHERE id = ${id} RETURNING *
     `;
     return NextResponse.json({ data: rows[0] });

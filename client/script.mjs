@@ -1,0 +1,1 @@
+import { sql } from './src/lib/db.ts'; async function run() { try { await sql\CREATE EXTENSION IF NOT EXISTS vector\; console.log('Extension vector enabled'); await sql\ALTER TABLE products ADD COLUMN IF NOT EXISTS embedding vector(1536)\; console.log('Column embedding added to products'); process.exit(0); } catch(e) { console.error(e); process.exit(1); } } run();

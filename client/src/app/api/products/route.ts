@@ -97,6 +97,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+import { generateProductEmbedding } from '@/lib/embeddings';
+
 /**
  * POST /api/products — create a new product
  */
@@ -109,11 +111,15 @@ export async function POST(request: NextRequest) {
       specs, color_options, quantity_breaks, is_active, allow_unlimited_stock
     } = body;
 
+    // Generate vector embedding
+    const embedding = await generateProductEmbedding(body);
+    const embeddingStr = embedding ? JSON.stringify(embedding) : null;
+
     const rows = await sql`
       INSERT INTO products
         (title, price, final_price, cost_price, stock, discount, description,
          image_url, gender, category_id, badge, features, rating, review_count,
-         specs, color_options, quantity_breaks, is_active, allow_unlimited_stock)
+         specs, color_options, quantity_breaks, is_active, allow_unlimited_stock, embedding)
       VALUES
         (${title}, ${price}, ${final_price ?? null}, ${cost_price ?? null},
          ${stock ?? 0}, ${discount ?? null}, ${description ?? null},
@@ -123,7 +129,8 @@ export async function POST(request: NextRequest) {
          ${specs ? JSON.stringify(specs) : null},
          ${color_options ? JSON.stringify(color_options) : null},
          ${quantity_breaks ? JSON.stringify(quantity_breaks) : null},
-         ${is_active ?? true}, ${allow_unlimited_stock ?? false})
+         ${is_active ?? true}, ${allow_unlimited_stock ?? false},
+         ${embeddingStr})
       RETURNING *
     `;
     return NextResponse.json({ data: rows[0] }, { status: 201 });
