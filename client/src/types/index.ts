@@ -47,6 +47,11 @@ export interface Product {
   quantity_breaks?: QuantityBreak[] | null;
   is_active?: boolean;
   allow_unlimited_stock?: boolean;
+  frame_shape?: string | null;
+  style_vibe?: string | null;
+  optical_fit?: string | null;
+  ideal_faces?: string[] | null;
+  embedding?: any | null;
   // joined
   categories?: Category | null;
 }
