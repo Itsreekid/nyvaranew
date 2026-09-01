@@ -8,6 +8,8 @@ import { useWishlist } from '@/context/WishlistContext';
 import { useState } from 'react';
 import Badge from '@/components/ui/Badge';
 import type { Product } from '@/types';
+import { useLanguage } from '@/context/LanguageContext';
+import { getTranslation } from '@/locales/dictionary';
 import styles from './ProductCard.module.css';
 import { fbEvent } from '@/components/analytics/FacebookPixel';
 
@@ -24,6 +26,8 @@ const formatTND = (price: number | null) => {
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
   const { addItem, isInCart } = useCart();
   const { addToWishlist, removeFromWishlist, isWishlisted } = useWishlist();
+  const { language } = useLanguage();
+  const t = (path: string) => getTranslation(language, path);
 
   const inCart     = isInCart(product.id);
   const wishlisted = isWishlisted(product.id);
@@ -73,10 +77,9 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   };
 
   const genderLabel: Record<string, string> = {
-    homme: "Men's",
-    femme: "Women's",
-    unisex: 'Unisex',
-    enfant: "Kids'",
+    homme: t('product.genderMen'),
+    femme: t('product.genderWomen'),
+    unisex: t('product.genderUnisex'),
   };
 
   return (
@@ -95,9 +98,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               className={styles.image}
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               priority={priority}
-              loading={priority ? undefined : "lazy"}
-              placeholder="blur"
-              blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO88OjRfwwAI6wDzX8/rDAAAAAASUVORK5CYII="
             />
           ) : (
             <div className={styles.imagePlaceholder} aria-hidden="true">
@@ -136,7 +136,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
         <div className={styles.info}>
           <div className={styles.meta}>
             {product.categories?.name && (
-              <span className={styles.category}>{product.categories.name}</span>
+              <span className={styles.category}>
+                {product.categories.name.toLowerCase().includes('solaires') ? t('product.categorySunglasses') : 
+                 product.categories.name.toLowerCase().includes('vue') ? t('product.categoryEyeglasses') : 
+                 product.categories.name}
+              </span>
             )}
           </div>
 
@@ -161,7 +165,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               style={{ opacity: isOutOfStock ? 0.5 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer' }}
             >
               <ShoppingBag size={14} />
-              <span>{inCart ? 'Added' : 'Add to Cart'}</span>
+              <span>{inCart ? '✔' : t('product.addToCart')}</span>
             </button>
           </div>
         </div>

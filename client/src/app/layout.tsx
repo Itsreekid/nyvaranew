@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Cormorant_Garamond, Roboto, Cairo } from 'next/font/google';
+import { Cormorant_Garamond, Roboto, Amiri } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -26,10 +26,10 @@ const roboto = Roboto({
   display: 'swap',
 });
 
-const cairo = Cairo({
-  weight: ['300', '400', '500', '600', '700'],
+const amiri = Amiri({
+  weight: ['400', '700'],
   subsets: ['arabic'],
-  variable: '--font-cairo',
+  variable: '--font-amiri',
   preload: true,
   display: 'swap',
 });
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${cormorant.variable} ${roboto.variable} ${cairo.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={`${cormorant.variable} ${roboto.variable} ${amiri.variable}`} suppressHydrationWarning>
       <head>
         {/* Preconnect to external origins */}
         <link rel="dns-prefetch" href="https://connect.facebook.net" />

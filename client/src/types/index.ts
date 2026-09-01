@@ -122,6 +122,7 @@ export interface ProductFilters {
   min_price?: number;
   max_price?: number;
   search?: string;
+  frame_shape?: string;
 }
 
 export interface TrendingProduct {
