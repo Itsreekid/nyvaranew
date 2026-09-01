@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const GOOGLE_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+const GOOGLE_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=';
 
 const buildSystemPrompt = (categoryName: string) => {
   const isGlasses = categoryName.toLowerCase().includes('lunettes') || categoryName.toLowerCase().includes('solaire');
