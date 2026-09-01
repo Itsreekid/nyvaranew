@@ -59,7 +59,12 @@ export default function AdminCategoriesPage() {
 
   const handleDelete = async (id: string, name: string | null) => {
     if (!confirm(`Supprimer la catégorie "${name}" ? Les produits liés ne seront pas supprimés.`)) return;
-    await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (!res.ok) {
+       showAdminError(json.error || 'Erreur lors de la suppression');
+       return;
+    }
     fetchCategories();
   };
 
