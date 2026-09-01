@@ -76,6 +76,7 @@ export default function AdminShell({ role, children }: Props) {
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
           {isAdmin && <NavLink href="/admin" icon={LayoutDashboard} exact>Tableau de bord</NavLink>}
           <NavLink href="/admin/orders" icon={ShoppingCart}>Commandes</NavLink>
+          <NavLink href="/admin/preparation" icon={Package}>Préparation (Cosmos)</NavLink>
           {isAdmin && <NavLink href="/admin/products" icon={Package}>Produits</NavLink>}
           {isAdmin && <NavLink href="/admin/categories" icon={Tag}>Catégories</NavLink>}
           {isAdmin && <NavLink href="/admin/employees" icon={Users}>Employés</NavLink>}

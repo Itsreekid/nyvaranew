@@ -33,23 +33,44 @@
 }
 
 /* ─── Logo ────────────────────────────────────────────────── */
-.logoWrapper {
+.logo {
+  font-family: var(--font-editorial);
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--color-black);
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   transition: opacity var(--transition-fast);
   z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.logoWrapper:hover { opacity: 0.7; }
+.logo:hover { opacity: 0.7; }
 
 /* ─── Nav Links (desktop) ─────────────────────────────────── */
+.leftGroup {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
 .navLinks {
   display: flex;
   align-items: center;
   gap: 32px;
+}
+.langToggleBtn {
+  font-size: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.05);
+  color: var(--color-black);
+  transition: background var(--transition-fast);
+}
+.langToggleBtn:hover {
+  background: rgba(0,0,0,0.1);
 }
 .navLink {
   font-size: 11px;
@@ -319,12 +340,14 @@
 
 /* ─── Responsive ──────────────────────────────────────────── */
 @media (max-width: 768px) {
+  .leftGroup    { position: absolute; left: 16px; gap: 0; }
   .navLinks     { display: none; }
   .hamburger    { display: flex; }
   .hideOnMobile { display: none !important; }
-  .inner        { padding: 0 16px; }
+  .logo         { font-size: 1.25rem; }
+  .inner        { padding: 0 16px; justify-content: center; }
   /* Cart + hamburger pushed to the right */
-  .actions      { margin-left: auto; gap: 2px; }
+  .actions      { position: absolute; right: 16px; margin-left: 0; gap: 2px; }
 }
 
 @media (max-width: 480px) {
