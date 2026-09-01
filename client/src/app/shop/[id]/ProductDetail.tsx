@@ -207,7 +207,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
     if (safeColorOptions.length > 0) {
       const hasMissingColor = selectedColors.some(c => c === null);
       if (hasMissingColor || selectedColors.length === 0) {
-        setToastMessage('{t('product.chooseColor')} une couleur pour continuer');
+        setToastMessage(t('product.chooseColorError'));
         setHasShake(true);
         setTimeout(() => setHasShake(false), 500);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -377,11 +377,11 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             {/* Color Selector — Mobile Only */}
             {qty === 1 && safeColorOptions.length > 0 && (
               <div className={`${styles.colorSelector} ${styles.mobileColorSelector}`}>
-                <p className={styles.colorLabel} style={{ textAlign: 'center', marginBottom: '12px', fontSize: '15px' }}>{t('product.color')} <strong>{selectedColors[0]?.name || '{t('product.chooseColor')}'}</strong></p>
+                <p className={styles.colorLabel} style={{ textAlign: 'center', marginBottom: '12px', fontSize: '15px' }}>{t('product.color')} <strong>{selectedColors[0]?.name || t('product.chooseColor')}</strong></p>
                 <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ justifyContent: 'center', position: 'relative' }}>
                   {hasShake && (
                     <div className={styles.colorTooltip}>
-                      {t('product.chooseColor')} une couleur pour continuer
+                      {t('product.chooseColorError')}
                     </div>
                   )}
                   {safeColorOptions.map(co => (
@@ -546,11 +546,11 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             {/* Selection des couleurs après l'offre — Desktop Only */}
             {qty === 1 && safeColorOptions.length > 0 && (
               <div className={`${styles.colorSelector} ${styles.desktopColorSelector}`}>
-                <p className={styles.colorLabel}>{t('product.color')} <strong>{selectedColors[0]?.name || '{t('product.chooseColor')}'}</strong></p>
+                <p className={styles.colorLabel}>{t('product.color')} <strong>{selectedColors[0]?.name || t('product.chooseColor')}</strong></p>
                 <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ position: 'relative' }}>
                   {hasShake && (
                     <div className={styles.colorTooltip}>
-                      {t('product.chooseColor')} une couleur pour continuer
+                      {t('product.chooseColorError')}
                     </div>
                   )}
                   {safeColorOptions.map(co => (
@@ -615,7 +615,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                 onClick={handleAddToCart}
                 disabled={!inStockBool}
               >
-                {inCart ? 'Ajouté au panier ✓' : '{t('product.addToCart')}'}
+                {inCart ? t('product.addedToCart') : t('product.addToCart')}
               </button>
 
               <button
@@ -623,7 +623,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                 onClick={handleWishlist}
               >
                 <Heart size={16} fill={wishlisted ? 'currentColor' : 'none'} />
-                {wishlisted ? 'Retiré des favoris' : 'Ajouter aux favoris'}
+                {wishlisted ? t('product.removeFromWishlist') : t('product.addToWishlist')}
               </button>
             </div>
 
@@ -745,7 +745,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
               }} />
             )}
             <ShoppingBag size={16} />
-            {inStockBool ? '{t('product.buyNow')}' : 'Rupture de stock'}
+            {inStockBool ? t('product.buyNow') : t('product.outOfStock')}
           </button>
         </div>
 
