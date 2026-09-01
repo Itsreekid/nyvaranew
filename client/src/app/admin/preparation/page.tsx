@@ -245,9 +245,11 @@ export default function StockPreparationPage() {
         </div>
       </div>
 
-      {/* --- Main Table --- */}
+      {/* --- Main Content --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        
+        {/* DESKTOP TABLE */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[700px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -425,6 +427,137 @@ export default function StockPreparationPage() {
             )}
           </tbody>
         </table>
+        </div>
+
+        {/* MOBILE CARDS */}
+        <div className="block md:hidden divide-y divide-gray-100">
+          <div className="p-4 bg-gray-50 flex items-center justify-between border-b border-gray-200">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300 text-nyvara-gold focus:ring-nyvara-gold w-4 h-4"
+                checked={isAllSelected}
+                ref={(input) => {
+                  if (input) input.indeterminate = isIndeterminate;
+                }}
+                onChange={handleSelectAll}
+              />
+              <span className="text-sm font-medium text-gray-700">Tout sélectionner</span>
+            </label>
+          </div>
+
+          {groupedProducts.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              Aucun produit en attente de préparation.
+            </div>
+          ) : (
+            groupedProducts.map((group) => {
+              const isExpanded = expandedGroups.has(group.productId);
+              const allGroupSelected = group.items.every(i => selectedIds.has(i.orderId));
+              const someGroupSelected = group.items.some(i => selectedIds.has(i.orderId));
+              const isGroupIndeterminate = someGroupSelected && !allGroupSelected;
+
+              return (
+                <div key={`mobile-${group.productId}`} className="flex flex-col">
+                  {/* Group Header Card */}
+                  <div className={`p-4 flex items-start gap-3 transition-colors ${isExpanded ? 'bg-gray-50' : 'bg-white'}`}>
+                    <div className="pt-1">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-nyvara-gold focus:ring-nyvara-gold w-4 h-4 cursor-pointer"
+                        checked={allGroupSelected}
+                        ref={(input) => {
+                          if (input) input.indeterminate = isGroupIndeterminate;
+                        }}
+                        onChange={(e) => handleSelectGroup(group, e.target.checked)}
+                      />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div 
+                            className="relative w-12 h-12 rounded-md bg-gray-100 border border-gray-200 shrink-0"
+                            onClick={() => group.productImage && setEnlargedImage(group.productImage)}
+                          >
+                            {group.productImage ? (
+                              <Image src={group.productImage} alt={group.productName} fill className="object-cover" sizes="48px" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px]">Img</div>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-gray-900 leading-tight">{group.productName}</h3>
+                            <div className="text-xs text-gray-500 mt-1">{group.items.length} client(s)</div>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => toggleGroupExpand(group.productId)}
+                          className="p-1.5 bg-gray-100 rounded-md text-gray-500"
+                        >
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        </button>
+                      </div>
+                      <div className="mt-1">
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-orange-50 text-nyvara-gold text-xs font-semibold">
+                          {group.totalQuantity} article(s) à préparer
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Orders for Mobile */}
+                  {isExpanded && (
+                    <div className="bg-gray-50 border-t border-gray-100">
+                      <div className="divide-y divide-gray-200/60">
+                        {group.items.map((item, idx) => {
+                          const isChecked = selectedIds.has(item.orderId);
+                          return (
+                            <div key={`mobile-order-${item.orderId}-${idx}`} className="p-4 pl-6 flex items-start gap-3">
+                              <div className="pt-1">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-nyvara-gold focus:ring-nyvara-gold w-4 h-4 cursor-pointer"
+                                  checked={isChecked}
+                                  onChange={(e) => handleSelectOrder(item.orderId, e.target.checked)}
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start mb-2">
+                                  <div>
+                                    <div className="font-semibold text-sm text-gray-900">{item.customerName}</div>
+                                    <div className="text-xs text-gray-500 font-mono mt-0.5">#{item.orderId.slice(0, 8)}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{item.phone}</div>
+                                  </div>
+                                  <div className="text-sm font-bold text-gray-900 whitespace-nowrap bg-white px-2 py-1 rounded border border-gray-200 shadow-sm">
+                                    Qté: {item.quantity}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2 bg-white p-2 rounded border border-gray-100">
+                                  <div 
+                                    className="relative w-8 h-8 rounded border border-gray-200 overflow-hidden shrink-0"
+                                    onClick={() => item.colorImage && setEnlargedImage(item.colorImage)}
+                                  >
+                                    {item.colorImage ? <Image src={item.colorImage} alt={item.colorName || 'Couleur'} fill className="object-cover" /> : <div className="w-full h-full bg-gray-100" />}
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {item.colorHex1 && (
+                                      <div className="w-2.5 h-2.5 rounded-full border border-gray-300" style={{ background: item.colorHex1 }} />
+                                    )}
+                                    <span className="text-xs font-medium text-gray-700">{item.colorName || 'Standard'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
