@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import type { OrderWithItems } from "../orders/page";
 import { showAdminSuccess } from '@/lib/admin-success';
