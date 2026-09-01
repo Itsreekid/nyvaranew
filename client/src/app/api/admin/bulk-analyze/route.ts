@@ -32,9 +32,14 @@ export async function GET(request: Request) {
     }
 
     let successCount = 0;
+    const errors: string[] = [];
 
     for (const product of productsToUpdate) {
-      // Build standard prompt asking only for the morphological fields
+      if (!product.image_url || !product.image_url.startsWith('http')) {
+        errors.push(`Product ${product.id} skipped: invalid image_url (must start with http)`);
+        continue;
+      }
+
       const prompt = `You are a fashion AI. Analyze this product image. Return STRICT JSON.
       {
         "frame_shape": "Rond Classique | Aviateur | Oeil-de-chat | Carree | Rectangulaire | Geometrique",
@@ -48,10 +53,13 @@ export async function GET(request: Request) {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://nyvara.net',
+          'X-Title': 'Nyvara Admin Bulk',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           model: MODEL,
+          response_format: { type: 'json_object' },
           messages: [{
             role: 'user',
             content: [
@@ -80,9 +88,12 @@ export async function GET(request: Request) {
             WHERE id = ${product.id}
           `;
           successCount++;
-        } catch (parseErr) {
-          console.error('Failed to parse AI response for product', product.id, content);
+        } catch (parseErr: any) {
+          errors.push(`Product ${product.id} parsing failed: ${parseErr.message} (Raw: ${content.substring(0, 50)})`);
         }
+      } else {
+        const errText = await res.text();
+        errors.push(`Product ${product.id} OpenRouter Error ${res.status}: ${errText}`);
       }
       
       // small delay to prevent rate limiting
@@ -91,7 +102,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: `Successfully analyzed and updated ${successCount} products. Please refresh this page to process the next batch of 10 products!`
+      message: `Successfully analyzed and updated ${successCount} products.`,
+      debug_errors: errors
     });
 
   } catch (error: any) {
