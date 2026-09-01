@@ -181,14 +181,14 @@ export default function StockPreparationPage() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-gray-500 animate-pulse">Chargement des produits à préparer...</div>;
+    return <div className="p-4 md:p-8 text-gray-500 animate-pulse">Chargement des produits à préparer...</div>;
   }
 
   const isAllSelected = orders.length > 0 && selectedIds.size === orders.length;
   const isIndeterminate = selectedIds.size > 0 && selectedIds.size < orders.length;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-4 md:space-y-6">
       {/* --- Image Enlargement Modal --- */}
       {enlargedImage && (
         <div 
@@ -214,19 +214,19 @@ export default function StockPreparationPage() {
       )}
 
       {/* --- Header --- */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Préparation des Stocks</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Préparation des Stocks</h1>
           <p className="text-sm text-gray-500 mt-1">
             Groupé par produit. Sélectionnez les commandes confirmées pour les expédier via Cosmos.
           </p>
         </div>
         
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <button
             onClick={fetchOrders}
             disabled={isSubmitting}
-            className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium shadow-sm hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
+            className="w-full sm:w-auto justify-center px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium shadow-sm hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
           >
             Actualiser
           </button>
@@ -234,7 +234,7 @@ export default function StockPreparationPage() {
           <button
             onClick={handleDispatch}
             disabled={selectedIds.size === 0 || isSubmitting}
-            className="px-5 py-2.5 bg-nyvara-charcoal text-white rounded-lg font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-black transition-all flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-5 py-2.5 bg-nyvara-charcoal text-white rounded-lg font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-black transition-all flex items-center gap-2"
           >
             {isSubmitting ? (
               "Envoi en cours..."
@@ -247,7 +247,8 @@ export default function StockPreparationPage() {
 
       {/* --- Main Table --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[700px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="p-4 w-12 text-center">
@@ -346,8 +347,8 @@ export default function StockPreparationPage() {
                     {isExpanded && (
                       <tr>
                         <td colSpan={5} className="p-0 border-b border-gray-200">
-                          <div className="bg-gray-50/50 p-4 pl-20 shadow-inner">
-                            <table className="w-full text-left text-sm">
+                          <div className="bg-gray-50/50 p-2 sm:p-4 sm:pl-20 shadow-inner overflow-x-auto">
+                            <table className="w-full text-left text-sm min-w-[500px]">
                               <thead>
                                 <tr className="text-gray-500 border-b border-gray-200/60">
                                   <th className="pb-2 w-10 text-center">Sélection</th>
@@ -424,6 +425,7 @@ export default function StockPreparationPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
