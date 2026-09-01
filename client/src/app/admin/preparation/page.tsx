@@ -76,9 +76,19 @@ export default function StockPreparationPage() {
         // Find specific color image if available
         let colorImage = item.products.image_url;
         if (item.selected_color_name && item.products.color_options) {
-          const colorOpt = item.products.color_options.find((c: any) => c.name === item.selected_color_name);
-          if (colorOpt && colorOpt.image_url) {
-            colorImage = colorOpt.image_url;
+          try {
+            const parsedColorOptions = typeof item.products.color_options === 'string'
+              ? JSON.parse(item.products.color_options)
+              : item.products.color_options;
+              
+            if (Array.isArray(parsedColorOptions)) {
+              const colorOpt = parsedColorOptions.find((c: any) => c.name === item.selected_color_name);
+              if (colorOpt && colorOpt.image_url) {
+                colorImage = colorOpt.image_url;
+              }
+            }
+          } catch (e) {
+            console.error('Failed to parse color_options', e);
           }
         }
     
