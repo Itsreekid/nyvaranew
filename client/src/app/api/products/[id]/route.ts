@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         frame_shape = ${b.frame_shape ?? null},
         style_vibe = ${b.style_vibe ?? null},
         optical_fit = ${b.optical_fit ?? null},
-        ideal_faces = ${b.ideal_faces ? JSON.stringify(b.ideal_faces) : null},
+        ideal_faces = ${b.ideal_faces ? b.ideal_faces : null},
         embedding = COALESCE(${embeddingStr}, embedding)
       WHERE id = ${id} RETURNING *
     `;

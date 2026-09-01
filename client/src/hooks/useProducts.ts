@@ -29,6 +29,7 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
       if (filters?.search) params.set('search', filters.search);
       if (filters?.min_price !== undefined) params.set('min_price', String(filters.min_price));
       if (filters?.max_price !== undefined) params.set('max_price', String(filters.max_price));
+      if (filters?.frame_shape) params.set('frame_shape', filters.frame_shape);
       if (sort) params.set('sort', sort);
       params.set('page', String(page));
       params.set('pageSize', String(pageSize));
@@ -44,7 +45,7 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
       setError(e instanceof Error ? e.message : 'Failed to load products');
     } finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters?.category_id, filters?.gender, filters?.min_price, filters?.max_price, filters?.search, sort, page, pageSize]);
+  }, [filters?.category_id, filters?.gender, filters?.min_price, filters?.max_price, filters?.search, filters?.frame_shape, sort, page, pageSize]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
   return { products, loading, error, totalCount, refetch: fetchProducts };

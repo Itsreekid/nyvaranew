@@ -10,7 +10,7 @@ import styles from './FrameCarousel.module.css';
 const FRAME_STYLES = (t: any) => [
   {
     id: 'square-classic',
-    originalName: 'Carrée',
+    originalName: 'Carree',
     name: t('shapes.square'),
     description: t('shapesDesc.square'),
     shape: (
@@ -61,7 +61,7 @@ const FRAME_STYLES = (t: any) => [
   },
   {
     id: 'cateye',
-    originalName: 'Œil-de-chat',
+    originalName: 'Oeil-de-chat',
     name: t('shapes.cateye'),
     description: t('shapesDesc.cateye'),
     shape: (
@@ -108,12 +108,12 @@ export default function FrameCarousel() {
             className={styles.cta} 
             onClick={() => {
               // Open modal and pass the suggested frame shape mapping
-              // Carrée -> square, Rond Classique -> round, Aviateur -> aviator, Œil-de-chat -> heart (closest match for cat-eye in FindYourFit)
+              // Carree -> square, Rond Classique -> round, Aviateur -> aviator, Oeil-de-chat -> heart (closest match for cat-eye in FindYourFit)
               let faceShape = 'round'; // fallback
-              if (frame.originalName === 'Carrée') faceShape = 'square';
+              if (frame.originalName === 'Carree') faceShape = 'square';
               else if (frame.originalName === 'Rond Classique') faceShape = 'round';
               else if (frame.originalName === 'Aviateur') faceShape = 'heart';
-              else if (frame.originalName === 'Œil-de-chat') faceShape = 'heart';
+              else if (frame.originalName === 'Oeil-de-chat') faceShape = 'heart';
               window.dispatchEvent(new CustomEvent('openQuizModal', { detail: { faceShape } }));
             }}
           >

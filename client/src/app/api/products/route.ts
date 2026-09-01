@@ -50,6 +50,11 @@ export async function GET(request: NextRequest) {
       conditions.push(`COALESCE(p.final_price, p.price) <= $${paramIdx++}`);
       params.push(max_price);
     }
+    const frame_shape = searchParams.get("frame_shape");
+    if (frame_shape) {
+      conditions.push(`p.frame_shape = $${paramIdx++}`);
+      params.push(frame_shape);
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -133,7 +138,7 @@ export async function POST(request: NextRequest) {
          ${quantity_breaks ? JSON.stringify(quantity_breaks) : null},
          ${is_active ?? true}, ${allow_unlimited_stock ?? false},
          ${frame_shape ?? null}, ${style_vibe ?? null}, ${optical_fit ?? null},
-         ${ideal_faces ? JSON.stringify(ideal_faces) : null},
+         ${ideal_faces ? ideal_faces : null},
          ${embeddingStr})
       RETURNING *
     `;

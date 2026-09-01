@@ -18,10 +18,10 @@ interface FilterSidebarProps {
 const FRAME_SHAPES_MAP = [
   { val: 'Rond Classique', key: 'shapes.round' },
   { val: 'Aviateur', key: 'shapes.aviator' },
-  { val: 'Œil-de-chat', key: 'shapes.cateye' },
-  { val: 'Carrée', key: 'shapes.square' },
+  { val: 'Oeil-de-chat', key: 'shapes.cateye' },
+  { val: 'Carree', key: 'shapes.square' },
   { val: 'Rectangulaire', key: 'shapes.rectangular' },
-  { val: 'Géométrique', key: 'shapes.geometric' },
+  { val: 'Geometrique', key: 'shapes.geometric' },
 ];
 
 export default function FilterSidebar({ filters, onChange, onReset }: FilterSidebarProps) {
