@@ -52,11 +52,10 @@ function getColorOptions(item: OrderItem): ColorOption[] {
 }
 
 function findColor(item: OrderItem): ColorOption | undefined {
-  return getColorOptions(item).find(
-    (co: ColorOption) => 
-      (item.selected_color_name && co.name === item.selected_color_name) ||
-      (item.selected_color_hex1 && co.hex1 === item.selected_color_hex1)
-  );
+  return getColorOptions(item).find((co: ColorOption) => {
+    if (item.selected_color_name && co.name) return item.selected_color_name === co.name;
+    return item.selected_color_hex1 === co.hex1 && (item.selected_color_hex2 || null) === (co.hex2 || null);
+  });
 }
 
 export default function OrderDetailsDrawer({
@@ -438,10 +437,10 @@ export default function OrderDetailsDrawer({
                         {isEditing ? (() => {
                           const colors   = getColorOptions(item);
                           const editItem = item as EditableItem;
-                          const selected = colors.find(co => 
-                            (editItem.selected_color_name && co.name === editItem.selected_color_name) ||
-                            (editItem.selected_color_hex1 && co.hex1 === editItem.selected_color_hex1)
-                          ) ?? null;
+                          const selected = colors.find(co => {
+                            if (editItem.selected_color_name && co.name) return editItem.selected_color_name === co.name;
+                            return editItem.selected_color_hex1 === co.hex1 && (editItem.selected_color_hex2 || null) === (co.hex2 || null);
+                          }) ?? null;
                           const isOpen   = openPickerId === item.id;
                           if (colors.length === 0) return <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>;
                           return (
@@ -500,8 +499,9 @@ export default function OrderDetailsDrawer({
                                     }}
                                   >✕</div>
                                   {colors.map(co => {
-                                    const active = (editItem.selected_color_name && editItem.selected_color_name === co.name) || 
-                                                   (editItem.selected_color_hex1 && editItem.selected_color_hex1 === co.hex1);
+                                    const active = (editItem.selected_color_name && co.name)
+                                      ? editItem.selected_color_name === co.name
+                                      : (editItem.selected_color_hex1 === co.hex1 && (editItem.selected_color_hex2 || null) === (co.hex2 || null));
                                     return (
                                       <div
                                         key={co.id}
