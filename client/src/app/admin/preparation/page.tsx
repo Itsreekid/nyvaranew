@@ -7,11 +7,14 @@ import { showAdminSuccess } from '@/lib/admin-success';
 import { showAdminError } from '@/lib/admin-error';
 import { ChevronDown, ChevronRight, X, ZoomIn } from 'lucide-react';
 
+type Urgency = 'new' | 'standard' | 'urgent';
+
 type GroupedProduct = {
   productId: string;
   productName: string;
   productImage: string;
   totalQuantity: number;
+  hasUrgent: boolean;
   items: {
     orderId: string;
     customerName: string | null;
@@ -19,8 +22,10 @@ type GroupedProduct = {
     quantity: number;
     colorName: string | null;
     colorHex1: string | null;
+    colorHex2: string | null;
     colorImage: string | null;
     order: OrderWithItems;
+    urgency: Urgency;
   }[];
 };
 
@@ -66,6 +71,7 @@ export default function StockPreparationPage() {
             productName: item.products.title,
             productImage: item.products.image_url || '',
             totalQuantity: 0,
+            hasUrgent: false,
             items: []
           });
         }
@@ -73,39 +79,71 @@ export default function StockPreparationPage() {
         const group = map.get(pid)!;
         group.totalQuantity += (item.quantity || 1);
         
-        // Find specific color image if available
+        // Find specific color image and name if available
         let colorImage = item.products.image_url;
-        if (item.selected_color_name && item.products.color_options) {
+        let colorName = item.selected_color_name;
+        
+        if (item.products.color_options) {
           try {
             const parsedColorOptions = typeof item.products.color_options === 'string'
               ? JSON.parse(item.products.color_options)
               : item.products.color_options;
               
             if (Array.isArray(parsedColorOptions)) {
-              const colorOpt = parsedColorOptions.find((c: any) => c.name === item.selected_color_name);
-              if (colorOpt && colorOpt.image_url) {
-                colorImage = colorOpt.image_url;
+              const colorOpt = parsedColorOptions.find((c: any) => {
+                if (item.selected_color_name && c.name) return item.selected_color_name === c.name;
+                return item.selected_color_hex1 === c.hex1 && (item.selected_color_hex2 || null) === (c.hex2 || null);
+              });
+              if (colorOpt) {
+                if (colorOpt.image_url) colorImage = colorOpt.image_url;
+                if (!colorName && colorOpt.name) colorName = colorOpt.name;
               }
             }
           } catch (e) {
             console.error('Failed to parse color_options', e);
           }
         }
+        
+        let urgency: Urgency = 'standard';
+        if (order.created_at) {
+          const diffHours = (new Date().getTime() - new Date(order.created_at).getTime()) / (1000 * 60 * 60);
+          if (diffHours > 48) urgency = 'urgent';
+          else if (diffHours < 24) urgency = 'new';
+        }
+        
+        if (urgency === 'urgent') group.hasUrgent = true;
     
         group.items.push({
           orderId: order.id,
           customerName: order.customer_name,
           phone: order.phone,
           quantity: item.quantity || 1,
-          colorName: item.selected_color_name,
+          colorName: colorName,
           colorHex1: item.selected_color_hex1,
+          colorHex2: item.selected_color_hex2,
           colorImage: colorImage,
-          order: order
+          order: order,
+          urgency
         });
       });
     });
     
-    return Array.from(map.values());
+    // Sort groups by putting groups with urgent items first, then sort items within each group
+    const groupsArray = Array.from(map.values());
+    groupsArray.sort((a, b) => (a.hasUrgent === b.hasUrgent ? 0 : a.hasUrgent ? -1 : 1));
+    groupsArray.forEach(group => {
+      group.items.sort((a, b) => {
+        const uVal = (u: Urgency) => (u === 'urgent' ? 0 : u === 'standard' ? 1 : 2);
+        const diff = uVal(a.urgency) - uVal(b.urgency);
+        if (diff !== 0) return diff;
+        // if same urgency, sort by date (older first)
+        const dateA = a.order.created_at ? new Date(a.order.created_at).getTime() : 0;
+        const dateB = b.order.created_at ? new Date(b.order.created_at).getTime() : 0;
+        return dateA - dateB;
+      });
+    });
+    
+    return groupsArray;
   }, [orders]);
 
   const toggleGroupExpand = (productId: string) => {
@@ -234,12 +272,12 @@ export default function StockPreparationPage() {
           <button
             onClick={handleDispatch}
             disabled={selectedIds.size === 0 || isSubmitting}
-            className="w-full sm:w-auto justify-center px-5 py-2.5 bg-nyvara-charcoal text-white rounded-lg font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-black transition-all flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-5 py-2.5 bg-green-600 text-white rounded-lg font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-700 transition-all flex items-center gap-2"
           >
             {isSubmitting ? (
               "Envoi en cours..."
             ) : (
-              `Confirmer & Envoyer à Cosmos (${selectedIds.size})`
+              `Confirmer (${selectedIds.size})`
             )}
           </button>
         </div>
@@ -334,7 +372,10 @@ export default function StockPreparationPage() {
                               <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Img</div>
                             )}
                           </div>
-                          <span className="text-sm font-bold text-gray-900">{group.productName}</span>
+                          <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                            {group.productName}
+                            {group.hasUrgent && <span title="Contient des commandes urgentes en retard">⚠️</span>}
+                          </span>
                         </div>
                       </td>
                       <td className="p-4 text-sm text-gray-600">
@@ -353,18 +394,23 @@ export default function StockPreparationPage() {
                             <table className="w-full text-left text-sm min-w-[500px]">
                               <thead>
                                 <tr className="text-gray-500 border-b border-gray-200/60">
-                                  <th className="pb-2 w-10 text-center">Sélection</th>
+                                  <th className="pb-2">Sélection</th>
                                   <th className="pb-2">Couleur & Image</th>
                                   <th className="pb-2">Client</th>
-                                  <th className="pb-2">ID Commande</th>
+                                  <th className="pb-2">Date Commande</th>
                                   <th className="pb-2 text-right pr-4">Quantité</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-200/60">
                                 {group.items.map((item, idx) => {
                                   const isChecked = selectedIds.has(item.orderId);
+                                  
+                                  let rowBg = 'hover:bg-white';
+                                  if (item.urgency === 'urgent') rowBg = 'bg-red-50 hover:bg-red-100';
+                                  else if (item.urgency === 'new') rowBg = 'bg-[#DAFBF3] hover:bg-[#c2efe5]';
+                                  
                                   return (
-                                    <tr key={`${item.orderId}-${idx}`} className="hover:bg-white transition-colors">
+                                    <tr key={`${item.orderId}-${idx}`} className={`transition-colors ${rowBg}`}>
                                       <td className="py-3 text-center">
                                         <input
                                           type="checkbox"
@@ -399,8 +445,12 @@ export default function StockPreparationPage() {
                                         <div className="flex items-center gap-2">
                                           {item.colorHex1 && (
                                             <div 
-                                              className="w-3 h-3 rounded-full border border-gray-300 shadow-sm" 
-                                              style={{ background: item.colorHex1 }} 
+                                              className="w-3 h-3 rounded-full border border-gray-300 shadow-sm shrink-0" 
+                                              style={{ 
+                                                background: item.colorHex2 
+                                                  ? `linear-gradient(135deg, ${item.colorHex1} 50%, ${item.colorHex2} 50%)` 
+                                                  : item.colorHex1 
+                                              }} 
                                             />
                                           )}
                                           <span className="font-medium text-gray-800">{item.colorName || 'Standard'}</span>
@@ -410,7 +460,14 @@ export default function StockPreparationPage() {
                                         <div className="font-medium text-gray-900">{item.customerName}</div>
                                         <div className="text-xs text-gray-500">{item.phone}</div>
                                       </td>
-                                      <td className="py-3 font-mono text-gray-500">#{item.orderId.slice(0, 8)}</td>
+                                      <td className="py-3 font-medium text-gray-600">
+                                        <div className="flex items-center gap-2">
+                                          {new Date(item.order.created_at || '').toLocaleDateString('fr-FR', {
+                                            day: '2-digit', month: 'short', year: 'numeric'
+                                          })}
+                                          {item.urgency === 'urgent' && <span title="En retard (> 48h)">⚠️</span>}
+                                        </div>
+                                      </td>
                                       <td className="py-3 text-right pr-4 font-bold text-gray-900">{item.quantity}</td>
                                     </tr>
                                   );
@@ -487,7 +544,10 @@ export default function StockPreparationPage() {
                             )}
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-gray-900 leading-tight">{group.productName}</h3>
+                            <h3 className="text-sm font-bold text-gray-900 leading-tight flex items-center gap-2">
+                              {group.productName}
+                              {group.hasUrgent && <span>⚠️</span>}
+                            </h3>
                             <div className="text-xs text-gray-500 mt-1">{group.items.length} client(s)</div>
                           </div>
                         </div>
@@ -512,8 +572,13 @@ export default function StockPreparationPage() {
                       <div className="divide-y divide-gray-200/60">
                         {group.items.map((item, idx) => {
                           const isChecked = selectedIds.has(item.orderId);
+                          
+                          let cardBg = '';
+                          if (item.urgency === 'urgent') cardBg = 'bg-red-50';
+                          else if (item.urgency === 'new') cardBg = 'bg-[#DAFBF3]';
+                          
                           return (
-                            <div key={`mobile-order-${item.orderId}-${idx}`} className="p-4 pl-6 flex items-start gap-3">
+                            <div key={`mobile-order-${item.orderId}-${idx}`} className={`p-4 pl-6 flex items-start gap-3 ${cardBg}`}>
                               <div className="pt-1">
                                 <input
                                   type="checkbox"
@@ -526,7 +591,12 @@ export default function StockPreparationPage() {
                                 <div className="flex justify-between items-start mb-2">
                                   <div>
                                     <div className="font-semibold text-sm text-gray-900">{item.customerName}</div>
-                                    <div className="text-xs text-gray-500 font-mono mt-0.5">#{item.orderId.slice(0, 8)}</div>
+                                    <div className={`text-xs font-medium mt-0.5 flex items-center gap-1 ${item.urgency === 'urgent' ? 'text-red-600' : 'text-sky-500'}`}>
+                                      {new Date(item.order.created_at || '').toLocaleDateString('fr-FR', {
+                                        day: '2-digit', month: 'short', year: 'numeric'
+                                      })}
+                                      {item.urgency === 'urgent' && <span>⚠️</span>}
+                                    </div>
                                     <div className="text-xs text-gray-500 mt-0.5">{item.phone}</div>
                                   </div>
                                   <div className="text-sm font-bold text-gray-900 whitespace-nowrap bg-white px-2 py-1 rounded border border-gray-200 shadow-sm">
@@ -542,7 +612,14 @@ export default function StockPreparationPage() {
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     {item.colorHex1 && (
-                                      <div className="w-2.5 h-2.5 rounded-full border border-gray-300" style={{ background: item.colorHex1 }} />
+                                      <div 
+                                        className="w-2.5 h-2.5 rounded-full border border-gray-300 shrink-0" 
+                                        style={{ 
+                                          background: item.colorHex2 
+                                            ? `linear-gradient(135deg, ${item.colorHex1} 50%, ${item.colorHex2} 50%)` 
+                                            : item.colorHex1 
+                                        }} 
+                                      />
                                     )}
                                     <span className="text-xs font-medium text-gray-700">{item.colorName || 'Standard'}</span>
                                   </div>
