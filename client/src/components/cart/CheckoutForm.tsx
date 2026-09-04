@@ -72,8 +72,17 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     if (!formData.nom || !formData.email || !formData.adresse || !formData.ville || !formData.telephone) {
       setErrorLocal('Veuillez remplir tous les champs obligatoires.');
+      setIsSubmitting(false);
       return;
     }
+
+    const phoneRegex = /^(?:\+216)?\d{8}$/;
+    if (!phoneRegex.test(formData.telephone.replace(/\s+/g, ''))) {
+      setErrorLocal('Numéro de téléphone invalide (ex: 27131431 ou +21627131431).');
+      setIsSubmitting(false);
+      return;
+    }
+
     setErrorLocal(null);
 
     // ── Persist identity to localStorage before firing CAPI events ──────────
