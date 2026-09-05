@@ -13,12 +13,15 @@ export const COSMOS_CITIES = [
 
 export type CosmosCity = typeof COSMOS_CITIES[number];
 
+/** Remove accents/diacritics from a string */
+const removeAccents = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 /** Try to match a free-text city to a valid Cosmos city */
 export function matchCity(input: string): CosmosCity {
-  const normalized = (input || '').trim().toLowerCase();
-  const match = COSMOS_CITIES.find(c => c.toLowerCase() === normalized);
+  const normalized = removeAccents((input || '').trim().toLowerCase());
+  const match = COSMOS_CITIES.find(c => removeAccents(c.toLowerCase()) === normalized);
   if (match) return match;
-  const partial = COSMOS_CITIES.find(c => c.toLowerCase().includes(normalized) || normalized.includes(c.toLowerCase()));
+  const partial = COSMOS_CITIES.find(c => removeAccents(c.toLowerCase()).includes(normalized) || normalized.includes(removeAccents(c.toLowerCase())));
   return partial ?? 'Tunis';
 }
 
