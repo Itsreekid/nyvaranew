@@ -194,7 +194,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
       const matchedColor = safeColorOptions.find(
         co => co.image_url === clickedSrc || co.image_url2 === clickedSrc
       );
-      if (matchedColor && selectedColors[0]?.id !== matchedColor.id) {
+      if (matchedColor && matchedColor.isAvailable !== false && selectedColors[0]?.id !== matchedColor.id) {
         if (qty === 1) {
           setSelectedColors([matchedColor]);
           setLastSelectedColor(matchedColor);
