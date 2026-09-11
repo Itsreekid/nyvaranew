@@ -109,6 +109,30 @@
 .thumbActive { border-color: var(--color-gold) !important; box-shadow: 0 0 0 1px var(--color-gold); }
 .thumbImg { object-fit: cover; }
 
+.thumbOutOfStock {
+  opacity: 0.4;
+  filter: grayscale(100%);
+}
+
+.outOfStockOverlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(229, 57, 53, 0.9);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  white-space: nowrap;
+}
+
 /* Buy box ── */
 .buyBox { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 

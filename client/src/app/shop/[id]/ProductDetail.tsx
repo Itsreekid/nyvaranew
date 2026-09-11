@@ -135,6 +135,15 @@ export default function ProductDetail({ product, gallery, related }: Props) {
 
   const safeColorOptions = parseColorOptions(product.color_options);
 
+  const isImageOutOfStock = (src: string | null) => {
+    if (!src) return false;
+    const colorsUsingThisImage = safeColorOptions.filter(co => co.image_url === src || co.image_url2 === src);
+    if (colorsUsingThisImage.length > 0) {
+      return colorsUsingThisImage.every(co => co.isAvailable === false);
+    }
+    return false;
+  };
+
   // Build one flat list: primary → all color images → extra gallery
   const allImages: string[] = [
     ...(product.image_url ? [product.image_url] : []),
@@ -329,16 +338,23 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                 <div className={styles.discountBadge}>-{product.discount}%</div>
               )}
               {activeImage ? (
-                <Image
-                  key={activeImage}
-                  src={activeImage}
-                  alt={product.title ?? 'Sunglasses'}
-                  fill
-                  className={styles.image}
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  priority
-                  fetchPriority="high"
-                />
+                <>
+                  <Image
+                    key={activeImage}
+                    src={activeImage}
+                    alt={product.title ?? 'Sunglasses'}
+                    fill
+                    className={styles.image}
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    priority
+                    fetchPriority="high"
+                  />
+                  {isImageOutOfStock(activeImage) && (
+                    <div className={styles.outOfStockOverlay}>
+                      {t('product.outOfStock')}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className={styles.placeholder}>NYVARA</div>
               )}
@@ -361,16 +377,19 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             {/* Thumbnails */}
             {allImages.length > 1 && (
               <div className={styles.thumbnails}>
-                {allImages.map((src, idx) => (
-                  <button
-                    key={src + idx}
-                    className={`${styles.thumb} ${idx === activeIdx ? styles.thumbActive : ''}`}
-                    onClick={() => handleThumbClick(idx)}
-                    aria-label={`Photo ${idx + 1}`}
-                  >
-                    <Image src={src} alt={`Vue ${idx + 1}`} fill className={styles.thumbImg} sizes="80px" loading="lazy" />
-                  </button>
-                ))}
+                {allImages.map((src, idx) => {
+                  const outOfStock = isImageOutOfStock(src);
+                  return (
+                    <button
+                      key={src + idx}
+                      className={`${styles.thumb} ${idx === activeIdx ? styles.thumbActive : ''} ${outOfStock ? styles.thumbOutOfStock : ''}`}
+                      onClick={() => handleThumbClick(idx)}
+                      aria-label={`Photo ${idx + 1}`}
+                    >
+                      <Image src={src} alt={`Vue ${idx + 1}`} fill className={styles.thumbImg} sizes="80px" loading="lazy" />
+                    </button>
+                  );
+                })}
               </div>
             )}
 
