@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
          ${quantity_breaks ? JSON.stringify(quantity_breaks) : null},
          ${is_active ?? true}, ${allow_unlimited_stock ?? false},
          ${frame_shape ?? null}, ${style_vibe ?? null}, ${optical_fit ?? null},
-         ${ideal_faces ? ideal_faces : null},
+         ${ideal_faces ? JSON.stringify(ideal_faces) : null},
          ${embeddingStr})
       RETURNING *
     `;
