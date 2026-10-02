@@ -70,7 +70,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   if (isSubmitting) return;
   setIsSubmitting(true);
 
-    if (!formData.nom || !formData.email || !formData.adresse || !formData.ville || !formData.telephone) {
+    if (!formData.nom || !formData.adresse || !formData.ville || !formData.telephone) {
       setErrorLocal('Veuillez remplir tous les champs obligatoires.');
       setIsSubmitting(false);
       return;
@@ -263,22 +263,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           />
         </div>
 
-        <div className={styles.inputGroup}>
-          <input
-            type="email"
-            name="email"
-            placeholder={t('checkout.emailPlaceholder')}
-            className={styles.input}
-            value={formData.email}
-            onChange={handleChange}
-            required
-            onBlur={(e) => {
-              if (e.target.value.includes('@')) {
-                persistMetaIdentity({ email: e.target.value });
-              }
-            }}
-          />
-        </div>
+
 
         <label className={styles.checkboxLabel}>
             <input

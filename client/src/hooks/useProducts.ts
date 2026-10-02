@@ -20,7 +20,7 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
   const pageSize = (filters as any)?.pageSize ?? 20;
   const page     = (filters as any)?.page     ?? 0;
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError(null);
     try {
       const params = new URLSearchParams();
@@ -35,19 +35,24 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption) {
       params.set('pageSize', String(pageSize));
       params.set('_t', String(Date.now())); // bust any CDN / browser cache
 
-      const res  = await fetch(`/api/products?${params}`, { cache: 'no-store' });
+      const res  = await fetch(`/api/products?${params}`, { cache: 'no-store', signal });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load products');
 
       setTotalCount(json.count ?? 0);
       setProducts(json.data ?? []);
-    } catch (e: unknown) {
+    } catch (e: any) {
+      if (e.name === 'AbortError') return;
       setError(e instanceof Error ? e.message : 'Failed to load products');
     } finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters?.category_id, filters?.gender, filters?.min_price, filters?.max_price, filters?.search, filters?.frame_shape, sort, page, pageSize]);
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchProducts(controller.signal);
+    return () => controller.abort();
+  }, [fetchProducts]);
   return { products, loading, error, totalCount, refetch: fetchProducts };
 }
 

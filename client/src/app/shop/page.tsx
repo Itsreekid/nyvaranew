@@ -54,7 +54,7 @@ function ShopContent() {
 
   useEffect(() => {
     if (urlCategorySlug && categories.length > 0 && !filters.category_id) {
-      const matched = categories.find(c => c.name && toSlug(c.name) === urlCategorySlug);
+      const matched = categories.find(c => (c.name && toSlug(c.name) === urlCategorySlug) || c.id === urlCategorySlug);
       if (matched) {
         setFilters(f => ({ ...f, category_id: matched.id, page: 0 }));
       }
