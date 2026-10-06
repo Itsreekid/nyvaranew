@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Package,
-  LogOut, Tag, Menu, X, Users, Megaphone, TrendingUp,
+  LogOut, Tag, Menu, X, Users, Megaphone, Home, TrendingUp,
 } from 'lucide-react';
 import { logoutAction } from '@/app/admin/actions';
 import { useOrderNotification } from '@/hooks/useOrderNotification';
@@ -76,10 +76,10 @@ export default function AdminShell({ role, children }: Props) {
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
           {isAdmin && <NavLink href="/admin" icon={LayoutDashboard} exact>Tableau de bord</NavLink>}
           <NavLink href="/admin/orders" icon={ShoppingCart}>Commandes</NavLink>
-          <NavLink href="/admin/preparation" icon={Package}>Préparation (Cosmos)</NavLink>
+          <NavLink href="/admin/preparation" icon={Package}>PrÃ©paration (Cosmos)</NavLink>
           {isAdmin && <NavLink href="/admin/products" icon={Package}>Produits</NavLink>}
-          {isAdmin && <NavLink href="/admin/categories" icon={Tag}>Catégories</NavLink>}
-          {isAdmin && <NavLink href="/admin/employees" icon={Users}>Employés</NavLink>}
+          {isAdmin && <NavLink href="/admin/categories" icon={Tag}>CatÃ©gories</NavLink>}
+          {isAdmin && <NavLink href="/admin/employees" icon={Users}>EmployÃ©s</NavLink>}
           {isAdmin && <NavLink href="/admin/catalog-ad" icon={Megaphone}>Catalog Ad</NavLink>}
           {isAdmin && <NavLink href="/admin/trending" icon={TrendingUp}>Tendances</NavLink>}
         </nav>
@@ -88,7 +88,7 @@ export default function AdminShell({ role, children }: Props) {
           <form action={logoutAction}>
             <button type="submit" className="flex items-center justify-center gap-3 w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors font-medium">
               <LogOut size={20} />
-              <span>Déconnexion</span>
+              <span>DÃ©connexion</span>
             </button>
           </form>
         </div>
@@ -107,13 +107,13 @@ export default function AdminShell({ role, children }: Props) {
               <Menu size={24} />
             </button>
             <div className="text-xl font-semibold text-gray-800 tracking-tight hidden sm:block">
-              {isAdmin ? "Espace d'administration" : 'Espace employé'}
+              {isAdmin ? "Espace d'administration" : 'Espace employÃ©'}
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end">
-              <span className="text-sm font-semibold text-gray-900">{isAdmin ? 'Admin' : 'Employé'}</span>
+              <span className="text-sm font-semibold text-gray-900">{isAdmin ? 'Admin' : 'EmployÃ©'}</span>
               <span className="text-xs text-gray-500">NYVARA Team</span>
             </div>
             <div className="w-10 h-10 rounded-full bg-nyvara-gold flex items-center justify-center text-white font-bold shadow-md">
