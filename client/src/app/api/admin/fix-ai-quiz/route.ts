@@ -3,7 +3,7 @@ import { sql } from '@/lib/db';
 
 export async function GET() {
   try {
-    const result = await sql
+    const result = await sql`
       UPDATE products 
       SET 
         frame_shape = 'Non spécifié',
@@ -11,7 +11,7 @@ export async function GET() {
         optical_fit = 'Standard',
         ideal_faces = ARRAY['Tous']::text[]
       WHERE frame_shape IS NULL OR style_vibe IS NULL;
-    ;
+    `;
 
     return NextResponse.json({ 
       success: true, 
