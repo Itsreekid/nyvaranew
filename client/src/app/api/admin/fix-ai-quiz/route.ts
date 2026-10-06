@@ -1,6 +1,8 @@
 ﻿import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const result = await sql`
@@ -10,7 +12,9 @@ export async function GET() {
         style_vibe = 'Standard',
         optical_fit = 'Standard',
         ideal_faces = ARRAY['Tous']::text[]
-      WHERE frame_shape IS NULL OR style_vibe IS NULL;
+      WHERE 
+        frame_shape IS NULL OR frame_shape = '' OR 
+        style_vibe IS NULL OR style_vibe = '';
     `;
 
     return NextResponse.json({ 
