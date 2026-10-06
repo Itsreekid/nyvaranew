@@ -74,7 +74,8 @@ export default function AdminShell({ role, children }: Props) {
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
-          {isAdmin && <NavLink href="/admin" icon={LayoutDashboard} exact>Tableau de bord</NavLink>}
+          {isAdmin && <NavLink href="/admin" icon={LayoutDashboard} exact>Tableau de bord</NavLink>
+          {isAdmin && <NavLink href="/admin/homepage" icon={Home}>Accueil</NavLink>}}
           <NavLink href="/admin/orders" icon={ShoppingCart}>Commandes</NavLink>
           <NavLink href="/admin/preparation" icon={Package}>PrÃ©paration (Cosmos)</NavLink>
           {isAdmin && <NavLink href="/admin/products" icon={Package}>Produits</NavLink>}
@@ -132,3 +133,4 @@ export default function AdminShell({ role, children }: Props) {
     </div>
   );
 }
+
