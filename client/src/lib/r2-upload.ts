@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 type PresignResponse = {
   uploadUrl: string;
@@ -10,13 +10,13 @@ type UploadFolder = 'products' | 'gallery' | 'colors';
 
 /**
  * Upload an image file directly to Cloudflare R2.
- * No compression, no conversion — just upload the file as-is.
+ * No compression, no conversion â€” just upload the file as-is.
  */
 export async function uploadImageToR2(
   file: File,
-  folder: UploadFolder = 'products',
+  folder: UploadFolder = 'products', requireSquare: boolean = true
 ): Promise<string> {
-  await validateSquareImage(file);
+  if (requireSquare) { await validateSquareImage(file); }
 
   const fileName = `${Date.now()}_${crypto.randomUUID()}.${getExtension(file)}`;
 
@@ -91,3 +91,4 @@ function getExtension(file: File): string {
     default: return 'jpg';
   }
 }
+

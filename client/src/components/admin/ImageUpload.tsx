@@ -12,7 +12,7 @@ interface ImageUploadProps {
   onUploading: (isUploading: boolean) => void;
   /** Optional: called with the raw File immediately on selection (before R2 upload). Use for AI analysis. */
   onFileSelected?: (file: File) => void;
-  folder?: 'products' | 'gallery' | 'colors';
+  folder?: 'products' | 'gallery' | 'colors'; requireSquare?: boolean;
 }
 
 type UploadPhase = 'idle' | 'uploading';
@@ -22,7 +22,7 @@ export default function ImageUpload({
   onChange,
   onUploading,
   onFileSelected,
-  folder = 'products',
+  folder = 'products', requireSquare = true,
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [phase, setPhase] = useState<UploadPhase>('idle');
@@ -72,7 +72,7 @@ export default function ImageUpload({
     setPhase('uploading');
 
     try {
-      const publicUrl = await uploadImageToR2(file, folder);
+      const publicUrl = await uploadImageToR2(file, folder, requireSquare);
       onChange(publicUrl);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erreur inconnue';

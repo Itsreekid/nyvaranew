@@ -162,7 +162,7 @@ export default function HomepageSettingsPage() {
                   value={settings.hero_image_url || ''}
                   onChange={(url) => setSettings({ ...settings, hero_image_url: url })}
                   onUploading={() => {}}
-                  folder="gallery"
+                  folder="gallery" requireSquare={false}
                 />
               </div>
 
@@ -184,4 +184,5 @@ const inputStyle = {
   fontFamily: 'inherit',
   backgroundColor: '#FAFAFA'
 };
+
 
