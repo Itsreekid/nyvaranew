@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 
 const GOOGLE_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=';
 
-const buildSystemPrompt = (categoryName: string) => {
-  const isGlasses = categoryName.toLowerCase().includes('lunettes') || categoryName.toLowerCase().includes('solaire');
-  const catText = categoryName && categoryName !== 'Produit général' ? categoryName : 'produit (lunettes, montres, accessoires, etc.)';
-  
-  return `You are an expert stylist and senior e-commerce copywriter for Nyvara, a premium Tunisian brand. Analyze the provided image of a product from the category "${catText}" and return STRICT valid JSON — no Markdown fences, no extra keys, no commentary outside the JSON object.
+const buildSystemPrompt = () => {
+  return `You are an expert stylist and senior e-commerce copywriter for Nyvara, a premium Tunisian brand. Analyze the provided image of a product and return STRICT valid JSON — no Markdown fences, no extra keys, no commentary outside the JSON object.
 
 Required schema (return ALL fields, use null if not applicable to this product category):
 {
@@ -19,7 +16,7 @@ Required schema (return ALL fields, use null if not applicable to this product c
   "promo_badge": "Offre Speciale",
   "rating_score": 4.8,
   "rating_count": 42,
-  "highlights_bullets": "Ligne 1\\nLigne 2\\nLigne 3\\nLigne 4",
+  "highlights_bullets": "Ligne 1\nLigne 2\nLigne 3\nLigne 4",
   "full_description": "2 paragraphes marketing detaillant le style, le confort et les finitions.",
   "product_type": "Type du produit (ex: lunettes_solaires, montre, bague, etc.)",
   "color_analysis": {
@@ -35,10 +32,10 @@ Required schema (return ALL fields, use null if not applicable to this product c
     { "key": "Caractéristique 5", "value": "Valeur" },
     { "key": "Caractéristique 6", "value": "Valeur" }
   ],
-  "frame_shape": ${isGlasses ? '"Rond Classique"' : 'null'},
+  "frame_shape": "Rond Classique",
   "style_vibe": "Retro",
-  "optical_fit": ${isGlasses ? '"Moyen / Standard"' : 'null'},
-  "ideal_faces": ${isGlasses ? '["Rond", "Oval"]' : 'null'}
+  "optical_fit": "Moyen / Standard",
+  "ideal_faces": ["Rond", "Oval"]
 }
 
 Rules:
@@ -53,16 +50,13 @@ Rules:
 - technical_specs: EXACTLY 6 entries as { key, value } objects describing the item (e.g. materials, dimensions, features). All in French.
 - style_vibe: MUST BE ONE OF: Retro | Minimaliste | Audacieux | Chic | Sport | Elegant
 - color_analysis.secondary_hex: null if the item is uniform in color.
-${isGlasses ? `- frame_shape: MUST BE ONE OF: Rond Classique | Aviateur | Oeil-de-chat | Carree | Rectangulaire | Geometrique
-- optical_fit: MUST BE ONE OF: Petit / Etroit | Moyen / Standard | Large
-- ideal_faces: array from: Rond | Oval | Carre | Coeur` : `- frame_shape: return null
-- optical_fit: return null
-- ideal_faces: return null`}
+- frame_shape: IF THE PRODUCT IS EYEWEAR/GLASSES, MUST BE ONE OF: Rond Classique | Aviateur | Oeil-de-chat | Carree | Rectangulaire | Geometrique (otherwise null)
+- optical_fit: IF THE PRODUCT IS EYEWEAR/GLASSES, MUST BE ONE OF: Petit / Etroit | Moyen / Standard | Large (otherwise null)
+- ideal_faces: IF THE PRODUCT IS EYEWEAR/GLASSES, array from: Rond | Oval | Carre | Coeur (otherwise null)
 - Output ONLY the JSON object. No prefix, no suffix, no markdown.`;
 };
 
 export async function POST(req: NextRequest) {
-  // Use free Google AI key from Coolify Environment Variables
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ success: false, error: 'Google API key is missing' }, { status: 500 });
@@ -70,13 +64,11 @@ export async function POST(req: NextRequest) {
 
   let imageBase64: string | undefined;
   let imageUrl: string | undefined;
-  let categoryName = 'Produit général';
 
   try {
     const body = await req.json();
     imageBase64 = body?.imageBase64;
     imageUrl = body?.imageUrl;
-    if (body?.categoryName) categoryName = body.categoryName;
   } catch (err: unknown) {
     console.error('[analyze-glasses] JSON parse error:', err);
     return NextResponse.json({ success: false, error: 'Invalid JSON body.' }, { status: 400 });
@@ -87,17 +79,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // If we only have URL, fetch it and convert to base64 for Google API
     if (imageUrl && !imageBase64) {
       const imgRes = await fetch(imageUrl);
       const arrayBuffer = await imgRes.arrayBuffer();
       imageBase64 = Buffer.from(arrayBuffer).toString('base64');
     }
 
-    // Google API expects raw base64 string without data:image/png;base64 prefix
     const rawBase64 = imageBase64!.replace(/^data:image\/\w+;base64,/, '');
-
-    const systemPrompt = buildSystemPrompt(categoryName);
+    const systemPrompt = buildSystemPrompt();
 
     const res = await fetch(GOOGLE_API_URL + apiKey, {
       method: 'POST',
@@ -134,7 +123,6 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
-    // Fallback cleanup just in case
     content = content.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const parsed = JSON.parse(content);
