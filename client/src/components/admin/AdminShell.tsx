@@ -39,7 +39,7 @@ export default function AdminShell({ role, children }: Props) {
     return (
       <Link 
         href={href} 
-        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium ${isActive ? 'bg-nyvara-gold text-white shadow-md' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
+        className={lex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium {isActive ? 'bg-nyvara-gold text-white shadow-md' : 'text-gray-300 hover:bg-white/10 hover:text-white'}}
       >
         <Icon size={20} />
         <span>{children}</span>
@@ -64,7 +64,7 @@ export default function AdminShell({ role, children }: Props) {
 
       {/* Sidebar */}
       <aside 
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-nyvara-charcoal text-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-2xl ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={ixed inset-y-0 left-0 z-50 w-72 bg-nyvara-charcoal text-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-2xl {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}}
       >
         <div className="flex items-center justify-between h-20 px-6 bg-black/50 border-b border-white/10">
           <div className="text-2xl font-bold tracking-[0.2em] text-nyvara-gold">NYVARA</div>
@@ -74,13 +74,13 @@ export default function AdminShell({ role, children }: Props) {
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
-          {isAdmin && <NavLink href="/admin" icon={LayoutDashboard} exact>Tableau de bord</NavLink>
-          {isAdmin && <NavLink href="/admin/homepage" icon={Home}>Accueil</NavLink>}}
+          {isAdmin && <NavLink href="/admin" icon={LayoutDashboard} exact>Tableau de bord</NavLink>}
+          {isAdmin && <NavLink href="/admin/homepage" icon={Home}>Accueil</NavLink>}
           <NavLink href="/admin/orders" icon={ShoppingCart}>Commandes</NavLink>
-          <NavLink href="/admin/preparation" icon={Package}>PrÃ©paration (Cosmos)</NavLink>
+          <NavLink href="/admin/preparation" icon={Package}>Préparation (Cosmos)</NavLink>
           {isAdmin && <NavLink href="/admin/products" icon={Package}>Produits</NavLink>}
-          {isAdmin && <NavLink href="/admin/categories" icon={Tag}>CatÃ©gories</NavLink>}
-          {isAdmin && <NavLink href="/admin/employees" icon={Users}>EmployÃ©s</NavLink>}
+          {isAdmin && <NavLink href="/admin/categories" icon={Tag}>Catégories</NavLink>}
+          {isAdmin && <NavLink href="/admin/employees" icon={Users}>Employés</NavLink>}
           {isAdmin && <NavLink href="/admin/catalog-ad" icon={Megaphone}>Catalog Ad</NavLink>}
           {isAdmin && <NavLink href="/admin/trending" icon={TrendingUp}>Tendances</NavLink>}
         </nav>
@@ -89,7 +89,7 @@ export default function AdminShell({ role, children }: Props) {
           <form action={logoutAction}>
             <button type="submit" className="flex items-center justify-center gap-3 w-full px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors font-medium">
               <LogOut size={20} />
-              <span>DÃ©connexion</span>
+              <span>Déconnexion</span>
             </button>
           </form>
         </div>
@@ -108,13 +108,13 @@ export default function AdminShell({ role, children }: Props) {
               <Menu size={24} />
             </button>
             <div className="text-xl font-semibold text-gray-800 tracking-tight hidden sm:block">
-              {isAdmin ? "Espace d'administration" : 'Espace employÃ©'}
+              {isAdmin ? "Espace d'administration" : 'Espace employé'}
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end">
-              <span className="text-sm font-semibold text-gray-900">{isAdmin ? 'Admin' : 'EmployÃ©'}</span>
+              <span className="text-sm font-semibold text-gray-900">{isAdmin ? 'Admin' : 'Employé'}</span>
               <span className="text-xs text-gray-500">NYVARA Team</span>
             </div>
             <div className="w-10 h-10 rounded-full bg-nyvara-gold flex items-center justify-center text-white font-bold shadow-md">
@@ -133,4 +133,3 @@ export default function AdminShell({ role, children }: Props) {
     </div>
   );
 }
-

@@ -1,6 +1,7 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import HeroSection      from '@/components/home/HeroSection';
+import { getHomepageSettings } from '@/lib/homepage-settings';
 
 const FrameCarousel = dynamic(() => import('@/components/home/FrameCarousel'));
 const FeaturedProducts = dynamic(() => import('@/components/home/FeaturedProducts'));
@@ -11,10 +12,14 @@ export const metadata: Metadata = {
   description: 'Discover Nyvara\'s unique, customizable luxury sunglasses. The way you see the day — create your perfect style.',
 };
 
-export default function HomePage() {
+export const revalidate = 0; // Ensure it refetches
+
+export default async function HomePage() {
+  const settings = await getHomepageSettings().catch(() => ({}));
+
   return (
     <>
-      <HeroSection />
+      <HeroSection settings={settings} />
       <FrameCarousel />
       <FeaturedProducts />
       <BrandStrip />

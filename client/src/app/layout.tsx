@@ -9,13 +9,12 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import MainWrapper from '@/components/layout/MainWrapper';
 import FacebookPixel from '@/components/analytics/FacebookPixel';
 
-// Optimize fonts: preload and specify weights
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-editorial',
   preload: true,
-  display: 'swap', // Use system font while loading
+  display: 'swap',
 });
 
 const roboto = Roboto({
@@ -35,16 +34,16 @@ const cairo = Cairo({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nyvara â€” Accessoires de Luxe Tunisie',
+    default: 'Nyvara — Accessoires de Luxe Tunisie',
     template: '%s | Nyvara',
   },
   description:
-    'DÃ©couvrez des accessoires de luxe uniques conÃ§us pour la Tunisie. Nyvara â€” lÃ  oÃ¹ l\'Ã©lÃ©gance rencontre le style de vie mÃ©diterranÃ©en.',
+    'Découvrez des accessoires de luxe uniques conçus pour la Tunisie. Nyvara — là où l\'élégance rencontre le style de vie méditerranéen.',
   keywords: ['accessoires de luxe', 'Tunisie', 'bijoux', 'bagues', 'lunettes de soleil', 'TND', 'Nyvara'],
   authors: [{ name: 'Nyvara' }],
   openGraph: {
-    title:       'Nyvara â€” Accessoires de Luxe Tunisie',
-    description: 'Accessoires de luxe uniques et Ã©lÃ©gants pour le marchÃ© tunisien.',
+    title:       'Nyvara — Accessoires de Luxe Tunisie',
+    description: 'Accessoires de luxe uniques et élégants pour le marché tunisien.',
     type:        'website',
     locale:      'fr_TN',
   },
@@ -52,9 +51,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${cormorant.variable} ${roboto.variable} ${cairo.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={${cormorant.variable}  } suppressHydrationWarning>
       <head>
-        {/* Preconnect to external origins */}
         <link rel="dns-prefetch" href="https://connect.facebook.net" />
         <FacebookPixel />
       </head>
@@ -74,4 +72,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
