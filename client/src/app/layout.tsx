@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { Cormorant_Garamond, Roboto, Cairo } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/layout/Navbar';
@@ -27,7 +27,6 @@ const roboto = Roboto({
 });
 
 const cairo = Cairo({
-  weight: ['300', '400', '500', '600', '700', '800'],
   subsets: ['arabic', 'latin'],
   variable: '--font-cairo',
   preload: true,
@@ -36,16 +35,16 @@ const cairo = Cairo({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nyvara — Accessoires de Luxe Tunisie',
+    default: 'Nyvara â€” Accessoires de Luxe Tunisie',
     template: '%s | Nyvara',
   },
   description:
-    'Découvrez des accessoires de luxe uniques conçus pour la Tunisie. Nyvara — là où l\'élégance rencontre le style de vie méditerranéen.',
+    'DÃ©couvrez des accessoires de luxe uniques conÃ§us pour la Tunisie. Nyvara â€” lÃ  oÃ¹ l\'Ã©lÃ©gance rencontre le style de vie mÃ©diterranÃ©en.',
   keywords: ['accessoires de luxe', 'Tunisie', 'bijoux', 'bagues', 'lunettes de soleil', 'TND', 'Nyvara'],
   authors: [{ name: 'Nyvara' }],
   openGraph: {
-    title:       'Nyvara — Accessoires de Luxe Tunisie',
-    description: 'Accessoires de luxe uniques et élégants pour le marché tunisien.',
+    title:       'Nyvara â€” Accessoires de Luxe Tunisie',
+    description: 'Accessoires de luxe uniques et Ã©lÃ©gants pour le marchÃ© tunisien.',
     type:        'website',
     locale:      'fr_TN',
   },
@@ -75,3 +74,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+
