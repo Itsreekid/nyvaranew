@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={${cormorant.variable}  } suppressHydrationWarning>
+    <html lang="fr" className={`${cormorant.variable} ${roboto.variable} ${cairo.variable}`} suppressHydrationWarning>
       <head>
         <link rel="dns-prefetch" href="https://connect.facebook.net" />
         <FacebookPixel />

@@ -39,7 +39,7 @@ export default function AdminShell({ role, children }: Props) {
     return (
       <Link 
         href={href} 
-        className={lex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium {isActive ? 'bg-nyvara-gold text-white shadow-md' : 'text-gray-300 hover:bg-white/10 hover:text-white'}}
+        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium ${isActive ? 'bg-nyvara-gold text-white shadow-md' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
       >
         <Icon size={20} />
         <span>{children}</span>
@@ -64,7 +64,7 @@ export default function AdminShell({ role, children }: Props) {
 
       {/* Sidebar */}
       <aside 
-        className={ixed inset-y-0 left-0 z-50 w-72 bg-nyvara-charcoal text-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-2xl {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}}
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-nyvara-charcoal text-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-2xl ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center justify-between h-20 px-6 bg-black/50 border-b border-white/10">
           <div className="text-2xl font-bold tracking-[0.2em] text-nyvara-gold">NYVARA</div>
