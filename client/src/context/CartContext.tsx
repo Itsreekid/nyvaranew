@@ -8,6 +8,7 @@ import { getProductColors, getPurchasableColor, getQuantityBreaks, validatePurch
 
 type CartAction =
   | { type: 'ADD_ITEMS'; product: Product; colorIds: (string | undefined)[] }
+  | { type: 'REPLACE_COLOR'; product: Product; from?: string; to: string }
   | { type: 'REMOVE_ITEM'; productId: string; colorId?: string }
   | { type: 'UPDATE_QUANTITY'; productId: string; colorId?: string; quantity: number }
   | { type: 'CLEAR_CART' }
@@ -35,6 +36,16 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         if (index === -1) items.push(next);
         else items[index] = next;
       }
+      return buildState(items);
+    }
+    case 'REPLACE_COLOR': {
+      const { product, from, to } = action;
+      const color = getPurchasableColor(getProductColors(product.color_options), to);
+      const original = state.items.find(item => item.product.id === product.id && item.selected_color?.id === from);
+      if (!color || !original || from === to) return state;
+      const existing = state.items.find(item => item.product.id === product.id && item.selected_color?.id === to);
+      const replacement = { product, selected_color: color, quantity: original.quantity + (existing?.quantity ?? 0) };
+      const items = state.items.filter(item => item !== existing).map(item => item === original ? replacement : item);
       return buildState(items);
     }
     case 'REMOVE_ITEM': {
@@ -101,6 +112,7 @@ function buildState(items: CartItem[]): CartState {
 
 interface CartContextValue extends CartState {
   addItems:       (product: Product, colors: (ColorOption | null)[]) => Promise<'stock' | 'color' | 'network' | null>;
+  replaceColor:   (product: Product, from: string | undefined, to: string) => void;
   removeItem:     (productId: string, colorId?: string) => void;
   updateQuantity: (productId: string, colorId: string | undefined, quantity: number) => void;
   clearCart:      () => void;
@@ -164,13 +176,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       pendingProducts.current.delete(product.id);
     }
   }, [state.items]);
+  const replaceColor = useCallback<CartContextValue['replaceColor']>((product, from, to) => dispatch({ type: 'REPLACE_COLOR', product, from, to }), []);
   const removeItem     = useCallback((productId: string, colorId?: string) => dispatch({ type: 'REMOVE_ITEM', productId, colorId }), []);
   const updateQuantity = useCallback((productId: string, colorId: string | undefined, quantity: number) => dispatch({ type: 'UPDATE_QUANTITY', productId, colorId, quantity }), []);
   const clearCart      = useCallback(() => dispatch({ type: 'CLEAR_CART' }), []);
   const isInCart       = useCallback((productId: string, colorId?: string) => state.items.some(i => i.product.id === productId && i.selected_color?.id === colorId), [state.items]);
 
   return (
-    <CartContext.Provider value={{ ...state, addItems, removeItem, updateQuantity, clearCart, isInCart }}>
+    <CartContext.Provider value={{ ...state, addItems, replaceColor, removeItem, updateQuantity, clearCart, isInCart }}>
       {children}
     </CartContext.Provider>
   );

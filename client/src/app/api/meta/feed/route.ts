@@ -8,23 +8,18 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const products = await sql`
+    const products = await sql<MetaCatalogProduct[]>`
       SELECT p.id, p.title, p.description, p.price, p.final_price, p.discount, p.stock, p.image_url,
              p.gender, p.badge, p.custom_label_0, p.color_options,
-             p.allow_unlimited_stock,
+             p.allow_unlimited_stock, p.is_active,
              json_build_object('id', c.id, 'name', c.name) AS categories
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
-      WHERE (p.stock > 0 OR p.allow_unlimited_stock = true)
-        AND p.image_url IS NOT NULL
-        AND COALESCE(p.final_price, p.price, 0) > 0
+      WHERE COALESCE(p.final_price, p.price, 0) > 0
         AND p.is_active IS NOT FALSE
       ORDER BY p.created_at DESC`;
 
-    const validProducts = products as any[];
-    console.log(`[Meta Feed] Serving ${validProducts.length} in-stock products`);
-
-    const items = validProducts.map(p => buildMetaCatalogXmlItem(p as unknown as MetaCatalogProduct)).join('\n');
+    const items = products.map(product => buildMetaCatalogXmlItem(product)).filter(Boolean).join('\n');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
@@ -39,7 +34,7 @@ ${items}
       status: 200,
       headers: {
         'Content-Type': 'application/xml; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        'Cache-Control': 'no-store, max-age=0',
       },
     });
   } catch (err: any) {

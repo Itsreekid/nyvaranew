@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShoppingBag, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { cartLineKey, useCartAvailability } from '@/hooks/useCartAvailability';
 import CartItem from '@/components/cart/CartItem';
 import OrderSummary from '@/components/cart/OrderSummary';
 import CheckoutForm from '@/components/cart/CheckoutForm';
@@ -22,11 +23,35 @@ function CartContent() {
 
   const [orderId, setOrderId] = useState<string | null>(null);
 
+  const { issues, error: availabilityError, checking, refresh } = useCartAvailability(items);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const autoCheckoutAttempted = useRef(false);
+  const autoCheckout = searchParams.get('checkout') === 'true';
+
+  useEffect(() => { setCheckoutError(null); }, [items]);
+
+  const attemptCheckout = useCallback(async () => {
+    setCheckoutError(null);
+    const ready = await refresh();
+    if (ready === null) return;
+    autoCheckoutAttempted.current = true;
+    if (ready) setStep('checkout');
+  }, [refresh]);
+
   useEffect(() => {
-    if (searchParams.get('checkout') === 'true' && items.length > 0) {
-      setStep('checkout');
+    if (!autoCheckout) autoCheckoutAttempted.current = false;
+    if (items.length > 0 && autoCheckout && !autoCheckoutAttempted.current) {
+      void attemptCheckout();
+    } else {
+      void refresh();
     }
-  }, [searchParams, items.length]);
+  }, [items.length, autoCheckout, attemptCheckout, refresh]);
+
+  useEffect(() => {
+    const recheck = () => { if (items.length > 0 && step === 'cart') void refresh(); };
+    window.addEventListener('focus', recheck);
+    return () => window.removeEventListener('focus', recheck);
+  }, [items.length, refresh, step]);
 
   if (step === 'success') {
     return (
@@ -99,12 +124,15 @@ function CartContent() {
             <div className={styles.items}>
               {step === 'cart' ? (
                 <>
+                  {(availabilityError || (checkoutError && !Object.values(issues).some(issue => issue.message === checkoutError))) && (
+                    <p role="alert" style={{ color: 'var(--color-error)', marginBottom: 12 }}>{availabilityError ?? checkoutError}</p>
+                  )}
                   <div className={styles.itemsHeader}>
                     <span>{t('checkout.itemHeader')}</span>
                     <span>{t('checkout.qtyHeader')}</span>
                   </div>
                   {items.map(item => (
-                    <CartItem key={`${item.product.id}-${item.selected_color?.id ?? 'no-color'}`} item={item} />
+                    <CartItem key={cartLineKey(item)} item={item} stockIssue={issues[cartLineKey(item)]} />
                   ))}
                   <div className={styles.continueShopping}>
                     <Link href="/shop" className={styles.continueLink}>
@@ -113,7 +141,11 @@ function CartContent() {
                   </div>
                 </>
               ) : (
-                <CheckoutForm onSuccess={(id) => {
+                <CheckoutForm onStockConflict={message => {
+                  setCheckoutError(message);
+                  setStep('cart');
+                  void refresh();
+                }} onSuccess={(id) => {
                   setOrderId(id);
                   setStep('success');
                   localStorage.setItem('nyvara_last_order', id);
@@ -125,7 +157,8 @@ function CartContent() {
             <div className={styles.summaryPanel}>
               <h2 className={styles.summaryTitle}>{t('checkout.summaryTitle')}</h2>
               <OrderSummary 
-                onCheckoutTap={() => setStep('checkout')} 
+                onCheckoutTap={attemptCheckout}
+                checkoutDisabled={checking}
                 showCheckoutBtn={step === 'cart'}
               />
             </div>

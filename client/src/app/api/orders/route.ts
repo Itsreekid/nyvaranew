@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
-import { getProductColors, getPurchasableColor, getQuantityBreaks, validatePurchase } from '@/lib/product-availability';
+import { getProductColors, getPurchasableColor, getQuantityBreaks, isSelectedColorUnavailable, unavailableColorMessage, validatePurchase } from '@/lib/product-availability';
 import type { CreateOrderPayload, Product } from '@/types';
 
 type OrderProduct = Pick<Product, 'id' | 'title' | 'price' | 'discount' | 'quantity_breaks' | 'stock'
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
               json_build_object(
                 'id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity,
                 'quantity_break_price', oi.quantity_break_price,
+                'selected_color_id', oi.selected_color_id,
                 'selected_color_name', oi.selected_color_name,
                 'selected_color_hex1', oi.selected_color_hex1,
                 'selected_color_hex2', oi.selected_color_hex2,
@@ -86,6 +87,7 @@ export async function GET(request: NextRequest) {
               json_build_object(
                 'id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity,
                 'quantity_break_price', oi.quantity_break_price,
+                'selected_color_id', oi.selected_color_id,
                 'selected_color_name', oi.selected_color_name,
                 'selected_color_hex1', oi.selected_color_hex1,
                 'selected_color_hex2', oi.selected_color_hex2,
@@ -141,29 +143,41 @@ export async function POST(request: NextRequest) {
         const productIds = [...new Set<string>(items.map(item => item.product_id))];
         const products = await transaction<OrderProduct[]>`
           SELECT id, title, price, discount, quantity_breaks, stock, allow_unlimited_stock, is_active, color_options
-          FROM products WHERE id = ANY(${productIds}::uuid[]) ORDER BY id FOR SHARE`;
+          FROM products WHERE id = ANY(${productIds}::uuid[]) ORDER BY id FOR UPDATE`;
 
         for (const product of products) productsById.set(product.id, product);
+        const productTotals: Record<string, number> = {};
         for (const productId of productIds) {
           const product = productsById.get(productId);
           if (!product) {
             return NextResponse.json({ error: 'Un article du panier est indisponible.' }, { status: 409 });
           }
-          const selections = items.filter(item => item.product_id === productId).map(item => ({
+          const productItems = items.filter(item => item.product_id === productId);
+          const colors = getProductColors(product.color_options);
+          const unavailable = productItems.find(item => isSelectedColorUnavailable(colors, item.selected_color?.id));
+          if (unavailable) {
+            const name = colors.find(color => color.id === unavailable.selected_color?.id)?.name
+              ?? unavailable.selected_color?.name;
+            return NextResponse.json({ error: unavailableColorMessage(name) }, { status: 409 });
+          }
+          const selections = productItems.map(item => ({
             quantity: item.quantity,
             colorId: item.selected_color?.id,
           }));
+          productTotals[productId] = selections.reduce((total, item) => total + item.quantity, 0);
           const issue = validatePurchase(product, selections);
           if (issue) {
-            const message = issue === 'color' ? 'Coloris indisponible. Retirez cet article du panier et choisissez un coloris disponible.'
-              : 'Stock insuffisant. Modifiez la quantité ou retirez cet article du panier.';
+            const message = 'Stock insuffisant. Modifiez la quantité ou retirez cet article du panier.';
             return NextResponse.json({ error: `${product.title ?? 'Article'} — ${message}` }, { status: 409 });
           }
         }
 
-        // Map total quantity per product (for quantity breaks)
-        const productTotals: Record<string, number> = {};
-        items.forEach(i => { productTotals[i.product_id] = (productTotals[i.product_id] || 0) + i.quantity; });
+        // The locked stock is consumed in the same transaction as the order.
+        for (const product of products) {
+          if (product.allow_unlimited_stock !== true) {
+            await transaction`UPDATE products SET stock = stock - ${productTotals[product.id]} WHERE id = ${product.id}`;
+          }
+        }
 
         // Calculate per-item unit price
         for (const i of items) {
@@ -200,9 +214,9 @@ export async function POST(request: NextRequest) {
           const product = productsById.get(i.product_id);
           const color = getPurchasableColor(getProductColors(product?.color_options), i.selected_color?.id);
           await transaction`
-            INSERT INTO order_items (order_id, product_id, quantity, selected_color_name, selected_color_hex1, selected_color_hex2, quantity_break_price)
+            INSERT INTO order_items (order_id, product_id, quantity, selected_color_id, selected_color_name, selected_color_hex1, selected_color_hex2, quantity_break_price)
             VALUES (${order.id}, ${i.product_id}, ${i.quantity},
-                    ${color?.name ?? null}, ${color?.hex1 ?? null}, ${color?.hex2 ?? null},
+                    ${color?.id ?? null}, ${color?.name ?? null}, ${color?.hex1 ?? null}, ${color?.hex2 ?? null},
                     ${itemPrices[idx].price})`;
         }
       }

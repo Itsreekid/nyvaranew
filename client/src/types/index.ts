@@ -77,6 +77,7 @@ export interface Order {
 }
 
 export interface OrderItem {
+  selected_color_id?: string | null;
   id: string;
   order_id: string | null;
   product_id: string | null;

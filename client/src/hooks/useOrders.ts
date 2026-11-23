@@ -48,8 +48,8 @@ export function useCreateOrder() {
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Order failed');
-      const order = json.data as { id: string };
+      if (!res.ok) return { error: json.error as string || 'Erreur lors de la commande. Veuillez réessayer.', stockConflict: res.status === 409 };
+      const order = json.data as { id: string; total_price?: number };
 
       // Trending: log order events for each item
       if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
@@ -59,10 +59,10 @@ export function useCreateOrder() {
       }
 
       setSuccess(true);
-      return order;
+      return { order };
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Order failed. Please try again.');
-      return null;
+      return { error: 'Erreur lors de la commande. Veuillez réessayer.', stockConflict: false };
     } finally { setLoading(false); }
   };
 

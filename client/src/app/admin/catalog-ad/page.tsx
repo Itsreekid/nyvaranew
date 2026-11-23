@@ -22,14 +22,14 @@ function buildXml(products: Product[], galleryByProduct: Record<string, string[]
     <title>Nyvara — Catalogue Produits</title>
     <link>${SITE_URL}</link>
     <description>Catalogue Meta Dynamic Ads — Nyvara Sunglasses</description>
-${products.map(p => buildMetaCatalogXmlItem(p, { galleryUrls: galleryByProduct[p.id] ?? [], indent: '  ' })).join('\n')}
+${products.map(p => buildMetaCatalogXmlItem(p, { galleryUrls: galleryByProduct[p.id] ?? [], indent: '  ' })).filter(Boolean).join('\n')}
   </channel>
 </rss>`;
 }
 
 function buildCsv(products: Product[], galleryByProduct: Record<string, string[]> = {}): string {
   const header = 'id,title,description,availability,condition,price,sale_price,link,image_link,additional_image_link,brand,google_product_category,gender';
-  const rows = products.map(p => buildMetaCatalogCsvRow(p, galleryByProduct[p.id] ?? []));
+  const rows = products.map(p => buildMetaCatalogCsvRow(p, galleryByProduct[p.id] ?? [])).filter(Boolean);
   return [header, ...rows].join('\n');
 }
 

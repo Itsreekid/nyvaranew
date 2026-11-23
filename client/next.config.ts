@@ -87,7 +87,7 @@ const nextConfig: NextConfig = {
       {
         source: '/api/meta/feed',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=3600, stale-while-revalidate=86400' },
+          { key: 'Cache-Control', value: 'no-store, max-age=0' },
           { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' },
           { key: 'X-Robots-Tag', value: 'noindex' },

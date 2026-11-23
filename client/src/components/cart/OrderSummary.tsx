@@ -12,9 +12,10 @@ const formatTND = (amount: number) =>
 interface OrderSummaryProps {
   onCheckoutTap?: () => void;
   showCheckoutBtn?: boolean;
+  checkoutDisabled?: boolean;
 }
 
-export default function OrderSummary({ onCheckoutTap, showCheckoutBtn = true }: OrderSummaryProps) {
+export default function OrderSummary({ onCheckoutTap, showCheckoutBtn = true, checkoutDisabled = false }: OrderSummaryProps) {
   const { items, total } = useCart();
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
@@ -39,7 +40,7 @@ export default function OrderSummary({ onCheckoutTap, showCheckoutBtn = true }: 
           variant="gold"
           fullWidth
           size="lg"
-          disabled={items.length === 0}
+          disabled={items.length === 0 || checkoutDisabled}
           onClick={onCheckoutTap}
         >
           {t('cart.checkoutBtn')}

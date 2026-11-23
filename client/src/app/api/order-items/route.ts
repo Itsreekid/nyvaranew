@@ -46,6 +46,11 @@ export async function PATCH(request: NextRequest) {
       UPDATE order_items SET
         quantity = ${quantity},
         quantity_break_price = ${quantity_break_price ?? null},
+        selected_color_id = CASE
+          WHEN selected_color_name IS DISTINCT FROM ${selected_color_name ?? null}
+            OR selected_color_hex1 IS DISTINCT FROM ${selected_color_hex1 ?? null}
+            OR selected_color_hex2 IS DISTINCT FROM ${selected_color_hex2 ?? null}
+          THEN NULL ELSE selected_color_id END,
         selected_color_name = ${selected_color_name ?? null},
         selected_color_hex1 = ${selected_color_hex1 ?? null},
         selected_color_hex2 = ${selected_color_hex2 ?? null}

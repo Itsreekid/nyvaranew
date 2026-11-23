@@ -4,17 +4,19 @@ import Image from 'next/image';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import type { CartItem as CartItemType } from '@/types';
+import type { CartStockIssue } from '@/hooks/useCartAvailability';
 import styles from './CartItem.module.css';
 
 interface CartItemProps {
   item: CartItemType;
+  stockIssue?: CartStockIssue;
 }
 
 const formatTND = (amount: number) =>
   `${amount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND`;
 
-export default function CartItem({ item }: CartItemProps) {
-  const { updateQuantity, removeItem } = useCart();
+export default function CartItem({ item, stockIssue }: CartItemProps) {
+  const { updateQuantity, removeItem, replaceColor } = useCart();
   const { product, quantity } = item;
 
   return (
@@ -50,6 +52,26 @@ export default function CartItem({ item }: CartItemProps) {
             Couleur : {item.selected_color.name}
           </p>
         )}
+        {stockIssue && (
+          <div className={styles.stockIssue} role="status">
+            <strong>Rupture de stock</strong>
+            <p>{stockIssue.message}</p>
+            {stockIssue.alternatives.length > 0 && (
+              <select
+                aria-label={`Choisir un autre coloris pour ${product.title ?? 'cet article'}`}
+                value=""
+                onChange={event => {
+                  if (stockIssue.product && event.target.value) {
+                    replaceColor(stockIssue.product, item.selected_color?.id, event.target.value);
+                  }
+                }}
+              >
+                <option value="" disabled>Choisir un autre coloris</option>
+                {stockIssue.alternatives.map(color => <option key={color.id} value={color.id}>{color.name}</option>)}
+              </select>
+            )}
+          </div>
+        )}
         <p className={styles.price}>
           {formatTND(
             (product.discount != null && product.discount > 0
@@ -72,6 +94,7 @@ export default function CartItem({ item }: CartItemProps) {
         <button
           className={styles.qtyBtn}
           onClick={() => updateQuantity(product.id, item.selected_color?.id, quantity + 1)}
+          disabled={Boolean(stockIssue)}
           aria-label="Increase quantity"
         >
           <Plus size={12} />
@@ -79,7 +102,7 @@ export default function CartItem({ item }: CartItemProps) {
         <button
           className={styles.removeBtn}
           onClick={() => removeItem(product.id, item.selected_color?.id)}
-          aria-label="Remove item"
+          aria-label="Retirer l’article"
         >
           <Trash2 size={14} />
         </button>

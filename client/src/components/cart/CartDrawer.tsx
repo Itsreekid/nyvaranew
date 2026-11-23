@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, ShoppingBag, Package } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { cartLineKey, useCartAvailability } from '@/hooks/useCartAvailability';
+import type { CartItem as CartLine } from '@/types';
 import CartItem from './CartItem';
 import OrderSummary from './OrderSummary';
 import Button from '@/components/ui/Button';
@@ -11,6 +13,8 @@ import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslation } from '@/locales/dictionary';
 import styles from './CartDrawer.module.css';
+
+const emptyCart: CartLine[] = [];
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -20,6 +24,9 @@ interface CartDrawerProps {
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, itemCount, clearCart } = useCart();
   const router = useRouter();
+  const { issues, refresh } = useCartAvailability(isOpen ? items : emptyCart);
+
+  useEffect(() => { if (isOpen) void refresh(); }, [isOpen, refresh]);
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
   const [lastOrder, setLastOrder] = useState<string | null>(null);
@@ -64,6 +71,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         aria-label="Panier"
         role="dialog"
         aria-modal="true"
+        inert={!isOpen}
       >
         {/* Header */}
         <div className={styles.header}>
@@ -114,7 +122,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               {/* Items list */}
               <div className={styles.items}>
                 {items.map(item => (
-                  <CartItem key={item.product.id + (item.selected_color?.id || '')} item={item} />
+                  <CartItem key={cartLineKey(item)} item={item} stockIssue={issues[cartLineKey(item)]} />
                 ))}
               </div>
 

@@ -1,5 +1,6 @@
 import type { Product } from '@/types';
 import { normalizeProductImageUrl } from '@/lib/r2';
+import { getAvailablePrimaryPhoto, getImageColors, getProductColors, isProductOutOfStock } from '@/lib/product-availability';
 
 export const DEFAULT_GOOGLE_PRODUCT_CATEGORY =
   'Apparel & Accessories > Clothing Accessories > Sunglasses';
@@ -15,6 +16,8 @@ export type MetaCatalogProduct = Pick<
   | 'final_price'
   | 'discount'
   | 'stock'
+  | 'is_active'
+  | 'allow_unlimited_stock'
   | 'image_url'
   | 'gender'
   | 'badge'
@@ -55,43 +58,57 @@ export function getProductPricing(product: {
   return { regularPrice, salePrice, onSale };
 }
 
-export function collectAdditionalImageUrls(
-  product: Pick<MetaCatalogProduct, 'image_url' | 'color_options'>,
-  galleryUrls: string[] = []
-): string[] {
-  const primary = normalizeProductImageUrl(product.image_url);
-  const seen = new Set<string>();
-  const additional: string[] = [];
+const SITE_URL = 'https://nyvara.net';
 
-  const add = (url: string | null | undefined) => {
-    const normalized = normalizeProductImageUrl(url);
-    if (!normalized || normalized === primary || seen.has(normalized)) return;
-    seen.add(normalized);
-    additional.push(normalized);
-  };
-
-  let colorOptions = product.color_options;
-  if (typeof colorOptions === 'string') {
-    try {
-      colorOptions = JSON.parse(colorOptions);
-    } catch {
-      colorOptions = [];
-    }
+function catalogImageUrl(value: string | null | undefined): string {
+  const normalized = normalizeProductImageUrl(value?.trim());
+  if (!/^(?:https?:\/\/|\/[^/])/i.test(normalized)) return '';
+  try {
+    const url = new URL(normalized, SITE_URL);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : '';
+  } catch {
+    return '';
   }
-  if (!Array.isArray(colorOptions)) {
-    colorOptions = [];
-  }
+}
 
-  for (const co of colorOptions) {
-    add(co.image_url);
-    add(co.image_url2);
-  }
+function getCatalogPresentation(product: MetaCatalogProduct, galleryUrls: string[]) {
+  const mainImage = catalogImageUrl(product.image_url) || null;
+  const colors = getProductColors(product.color_options).map(color => ({
+    ...color,
+    image_url: catalogImageUrl(color.image_url),
+    image_url2: catalogImageUrl(color.image_url2),
+  }));
+  const soldOut = isProductOutOfStock(product, colors);
+  const photo = soldOut ? undefined : getAvailablePrimaryPhoto(mainImage, colors);
+  const mainOwners = getImageColors(mainImage, mainImage, colors);
+  const primary = soldOut
+    ? mainImage || colors.find(color => color.image_url)?.image_url
+    : photo?.src || (mainOwners.length === 0 ? mainImage : null);
+  // An entry needs a product photo. Skip it if the only primary images are unsafe.
+  if (!primary) return null;
 
-  for (const url of galleryUrls) {
-    add(url);
-  }
+  const link = new URL('/shop/' + encodeURIComponent(product.id), SITE_URL);
+  if (photo) link.searchParams.set('color', photo.color.id);
+  const additionalImages = [...new Set([
+    ...colors.flatMap(color => [color.image_url, color.image_url2]),
+    ...galleryUrls.map(catalogImageUrl),
+  ])].filter(src => {
+    if (!src || src === primary || soldOut) return false;
+    const owners = getImageColors(src, mainImage, colors);
+    return colors.length === 0 || (owners.length > 0 && owners.every(owner => owner.isAvailable !== false));
+  }).slice(0, 10);
 
-  return additional;
+  return { primary, link: link.href, availability: soldOut ? 'out of stock' : 'in stock', additionalImages };
+}
+
+function cleanCatalogCopy(value: string | null | undefined): string {
+  return (value ?? '')
+    .replace(/coloris[ \t]+[^—–|\r\n]+[—–][ \t]*indisponible/giu, '')
+    .replace(/voir le coloris(?:[ \t]+[^—–|;\r\n]+)?/giu, '')
+    .replace(/(?<![\p{L}])(?:rupture de stock|épuisé|indisponible)(?![\p{L}])/giu, '')
+    .replace(/(?:[ \t]*[—–|][ \t]*)+$/gmu, '')
+    .replace(/^[ \t]*[—–|][ \t]*/gmu, '')
+    .trim();
 }
 
 function escXml(value: string): string {
@@ -116,11 +133,13 @@ export function buildMetaCatalogXmlItem(
 ): string {
   const indent = options?.indent ?? '    ';
   const { regularPrice, salePrice, onSale } = getProductPricing(product);
-  const title = escXml(product.title ?? 'Nyvara Sunglasses');
-  const description = escXml(product.description ?? 'Lunettes de soleil de luxe — Nyvara Tunisia');
-  const link = escXml(`https://nyvara.net/shop/${product.id}`);
-  const imageLink = escXml(normalizeProductImageUrl(product.image_url));
-  const availability = (product.stock ?? 0) > 0 ? 'in stock' : 'out of stock';
+  const catalog = getCatalogPresentation(product, options?.galleryUrls ?? []);
+  if (!catalog) return '';
+  const title = escXml(cleanCatalogCopy(product.title) || 'Nyvara Sunglasses');
+  const description = escXml(cleanCatalogCopy(product.description) || 'Lunettes de soleil de luxe — Nyvara Tunisia');
+  const link = escXml(catalog.link);
+  const imageLink = escXml(catalog.primary);
+  const { availability, additionalImages } = catalog;
   const brand = escXml(product.brand ?? DEFAULT_BRAND);
   const googleCategory = escXml(product.google_product_category ?? DEFAULT_GOOGLE_PRODUCT_CATEGORY);
   const categoryName = Array.isArray(product.categories)
@@ -135,19 +154,13 @@ ${indent}  <g:sale_price>${formatMetaPrice(salePrice)}</g:sale_price>`
     : `<g:price>${formatMetaPrice(salePrice)}</g:price>`;
 
   let customLabels = '';
-  if (product.custom_label_0) {
-    customLabels += `\n${indent}  <g:custom_label_0>${escXml(product.custom_label_0)}</g:custom_label_0>`;
+  const labels = [cleanCatalogCopy(product.custom_label_0), cleanCatalogCopy(product.badge)].filter(Boolean);
+  for (const [index, label] of labels.entries()) {
+    customLabels += `\n${indent}  <g:custom_label_${index}>${escXml(label)}</g:custom_label_${index}>`;
   }
-  if (product.badge) {
-    const badgeIdx = product.custom_label_0 ? 1 : 0;
-    customLabels += `\n${indent}  <g:custom_label_${badgeIdx}>${escXml(product.badge)}</g:custom_label_${badgeIdx}>`;
-  }
-
-  const additionalImages = collectAdditionalImageUrls(product, options?.galleryUrls);
   let additionalImagesXml = '';
   if (additionalImages.length > 0) {
     additionalImagesXml = '\n' + additionalImages
-      .slice(0, 10)
       .map(url => `${indent}  <g:additional_image_link>${escXml(url)}</g:additional_image_link>`)
       .join('\n');
   }
@@ -171,19 +184,20 @@ ${indent}</item>`;
 export function buildMetaCatalogCsvRow(product: MetaCatalogProduct, galleryUrls: string[] = []): string {
   const esc = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const { regularPrice, salePrice, onSale } = getProductPricing(product);
-  const additionalImages = collectAdditionalImageUrls(product, galleryUrls);
+  const catalog = getCatalogPresentation(product, galleryUrls);
+  if (!catalog) return '';
 
   return [
     esc(product.id),
-    esc(product.title ?? ''),
-    esc(product.description ?? 'Lunettes de soleil Nyvara'),
-    esc((product.stock ?? 0) > 0 ? 'in stock' : 'out of stock'),
+    esc(cleanCatalogCopy(product.title) || 'Nyvara Sunglasses'),
+    esc(cleanCatalogCopy(product.description) || 'Lunettes de soleil Nyvara'),
+    esc(catalog.availability),
     esc('new'),
     esc(formatMetaPrice(onSale ? regularPrice : salePrice)),
     esc(onSale ? formatMetaPrice(salePrice) : ''),
-    esc(`https://nyvara.net/shop/${product.id}`),
-    esc(normalizeProductImageUrl(product.image_url)),
-    esc(additionalImages.join(',')),
+    esc(catalog.link),
+    esc(catalog.primary),
+    esc(catalog.additionalImages.join(',')),
     esc(product.brand ?? DEFAULT_BRAND),
     esc(product.google_product_category ?? DEFAULT_GOOGLE_PRODUCT_CATEGORY),
     esc(product.gender === 'homme' ? 'male' : product.gender === 'femme' ? 'female' : 'unisex'),

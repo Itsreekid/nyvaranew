@@ -19,9 +19,10 @@ const CITIES = [
 
 interface CheckoutFormProps {
   onSuccess: (orderId: string) => void;
+  onStockConflict: (message: string) => void;
 }
 
-export default function CheckoutForm({ onSuccess }: CheckoutFormProps) {
+export default function CheckoutForm({ onSuccess, onStockConflict }: CheckoutFormProps) {
   const { items, total, clearCart } = useCart();
   const { createOrder, loading } = useCreateOrder();
   const { language } = useLanguage();
@@ -124,10 +125,11 @@ const handleSubmit = async (e: React.FormEvent) => {
       })),
     };
 
-  const result = await createOrder(payload);
+  const response = await createOrder(payload);
+  const result = response.order;
 
   if (result) {
-      const actualTotal = (result as any).total_price ?? total;
+      const actualTotal = result.total_price ?? total;
       const contents = buildPurchaseContents(items);
 
       // Save user data for EMQ improvements
@@ -152,7 +154,8 @@ const handleSubmit = async (e: React.FormEvent) => {
     onSuccess(result.id);
     setIsSubmitting(false);
   } else {
-    setErrorLocal('Erreur lors de la commande. Veuillez réessayer.');
+    if (response.stockConflict) onStockConflict(response.error);
+    else setErrorLocal(response.error);
     setIsSubmitting(false);
     }
   };

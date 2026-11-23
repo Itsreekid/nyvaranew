@@ -11,7 +11,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import ProductCard from '@/components/shop/ProductCard';
 import type { Product, ColorOption } from '@/types';
-import { getColorPhoto, getImageColors, getProductColors, getProductGallery, getPurchasableColor, isColorImageSoldOut, isProductOutOfStock } from '@/lib/product-availability';
+import { getColorsAvailableFirst, getColorPhoto, getImageColors, getProductColors, getProductGallery, getPurchasableColor, isColorImageSoldOut, isProductOutOfStock } from '@/lib/product-availability';
 import Toast from '@/components/ui/Toast';
 import styles from './product.module.css';
 import { fbEvent } from '@/components/analytics/FacebookPixel';
@@ -92,7 +92,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
     ? Math.round(product.price * (1 - product.discount! / 100))
     : null;
 
-  const safeColorOptions = getProductColors(product.color_options);
+  const safeColorOptions = getColorsAvailableFirst(getProductColors(product.color_options));
   const initialColor = safeColorOptions.find(color => color.id === initialColorId);
   const inStockBool = !isProductOutOfStock(product, safeColorOptions);
   const hasQuantityBreaks = Boolean(product.quantity_breaks?.length);
@@ -124,11 +124,14 @@ export default function ProductDetail({ product, gallery, related, initialColorI
   }, [qty, hasQuantityBreaks]);
 
   const mainImage = product.image_url || null;
-  const allImages = getProductGallery(mainImage, safeColorOptions, gallery.map(image => image.image_url));
+  const allImages = getProductGallery(mainImage, safeColorOptions, gallery.map(image => image.image_url), !inStockBool);
   const imageIndexForColor = (color: ColorOption) =>
     Math.max(0, allImages.indexOf(getColorPhoto(color, mainImage) ?? ''));
 
-  const [activeIdx, setActiveIdx] = useState(() => initialColor ? imageIndexForColor(initialColor) : 0);
+  const [activePhoto, setActivePhoto] = useState<string | null>(null);
+  const activeIdx = activePhoto && allImages.includes(activePhoto)
+    ? allImages.indexOf(activePhoto)
+    : initialColor ? imageIndexForColor(initialColor) : 0;
   const [isPaused, setIsPaused] = useState(false);
   const [autoPlayStopped, setAutoPlayStopped] = useState(Boolean(initialColor));
   const [isZoomed, setIsZoomed] = useState(false);
@@ -154,11 +157,11 @@ export default function ProductDetail({ product, gallery, related, initialColorI
   // Auto-slideshow
   useEffect(() => {
     if (allImages.length <= 1 || isPaused || autoPlayStopped) return;
-    const id = setInterval(() => {
-      setActiveIdx(prev => (prev + 1) % allImages.length);
+    const id = setTimeout(() => {
+      setActivePhoto(allImages[(activeIdx + 1) % allImages.length]);
     }, SLIDE_INTERVAL);
-    return () => clearInterval(id);
-  }, [allImages.length, isPaused, autoPlayStopped]);
+    return () => clearTimeout(id);
+  }, [activeIdx, allImages, isPaused, autoPlayStopped]);
 
   // Cursor-point zoom
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -177,7 +180,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
   };
 
   const handleThumbClick = (idx: number) => {
-    setActiveIdx(idx);
+    setActivePhoto(allImages[idx] ?? null);
     setAutoPlayStopped(true);
   };
 
@@ -331,7 +334,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
                     priority
                     fetchPriority="high"
                   />
-                  {imageSoldOut && (
+                  {(imageSoldOut || !inStockBool) && (
                     <div className={styles.outOfStockOverlay}>
                       {t('product.outOfStock')}
                     </div>
@@ -407,6 +410,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
                       className={`${styles.colorCircle} ${selectedColors[0]?.id === co.id ? styles.colorCircleActive : ''} ${co.isAvailable === false ? styles.colorDisabled : ''}`}
                       onClick={() => selectColor(co)}
                       style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)`, width: '36px', height: '36px' } : { background: co.hex1, width: '36px', height: '36px' }}
+                      aria-pressed={selectedColors[0]?.id === co.id}
                       title={co.name}
                     />
                   ))}
@@ -532,6 +536,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
                                         selectColor(co, uIdx);
                                       }}
                                       style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)` } : { background: co.hex1 }}
+                                      aria-pressed={selectedColors[uIdx]?.id === co.id}
                                       title={co.name}
                                     />
                                   ))}
@@ -565,6 +570,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
                       className={`${styles.colorCircle} ${selectedColors[0]?.id === co.id ? styles.colorCircleActive : ''} ${co.isAvailable === false ? styles.colorDisabled : ''}`}
                       onClick={() => selectColor(co)}
                       style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)` } : { background: co.hex1 }}
+                      aria-pressed={selectedColors[0]?.id === co.id}
                       title={co.name}
                     />
                   ))}
