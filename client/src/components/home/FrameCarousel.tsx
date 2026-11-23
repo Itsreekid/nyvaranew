@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslation } from '@/locales/dictionary';
 import styles from './FrameCarousel.module.css';
@@ -93,16 +93,21 @@ export default function FrameCarousel() {
 
   return (
     <section className={styles.section} aria-labelledby="frame-carousel-title" dir={language === 'fr' ? 'ltr' : 'rtl'}>
+      {/* Background watermark text */}
+      <span className={styles.watermark} aria-hidden="true">
+        {frame.name.toUpperCase()}
+      </span>
+
       <div className={styles.inner}>
         <div className={styles.textCol}>
-          <h2 id="frame-carousel-title" className={styles.headline}>
-            {language === 'fr' ? 'Trouvez votre monture' : 'اختار الإطار اللي يناسبك'}
-          </h2>
-          <p className={styles.sub}>{t('slider.sub')}</p>
+          <p className={styles.eyebrow}>{t('slider.eyebrow')}</p>
+          <h2 id="frame-carousel-title" className={styles.headline} style={{ whiteSpace: 'pre-line' }}>{t('slider.title')}</h2>
+          <p className={styles.sub} style={{ whiteSpace: 'pre-line' }}>
+            {t('slider.sub')}
+          </p>
           <button type="button" className={styles.cta}
             onClick={() => window.dispatchEvent(new CustomEvent('openQuizModal'))}>
             {t('slider.customizeBtn')}
-            <ArrowUpRight size={17} aria-hidden="true" />
           </button>
         </div>
 
@@ -121,40 +126,42 @@ export default function FrameCarousel() {
             if (Math.abs(offset) < 45 || Math.abs(offset) <= Math.abs(touch.clientY - start.y)) return;
             ((offset < 0) === (language === 'fr') ? next : prev)();
           }}>
-          <div className={styles.stage}>
-            <button type="button" className={styles.navBtn} onClick={prev}
-              aria-label={language === 'fr' ? 'Monture précédente' : 'الإطار السابق'}>
-              <ArrowLeft size={19} aria-hidden="true" />
-            </button>
+          {/* Navigation */}
+          <button type="button" className={styles.navBtn} onClick={prev} aria-label={language === 'fr' ? 'Monture précédente' : 'الإطار السابق'}>
+            <ArrowLeft size={20} />
+          </button>
 
-            <div className={styles.frameDisplay}>
-              <div className={styles.frameSvgWrap}>{frame.shape}</div>
-              <div aria-live="polite" aria-atomic="true">
-                <h3 className={styles.frameName}>{frame.name}</h3>
-                <p className={styles.frameDesc}>{frame.description}</p>
+          {/* Frame display */}
+          <div className={styles.frameDisplay} key={frame.id}>
+            <Link href={`/shop?frame_shape=${encodeURIComponent(frame.originalName)}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+              <div className={styles.frameSvgWrap}>
+                {frame.shape}
               </div>
-              <Link className={styles.shopLink} href={`/shop?frame_shape=${encodeURIComponent(frame.originalName)}`}>
-                {language === 'fr' ? 'Voir les montures' : 'شوف الإطارات'}
-                <ArrowUpRight size={15} aria-hidden="true" />
-              </Link>
-            </div>
-
-            <button type="button" className={styles.navBtn} onClick={next}
-              aria-label={language === 'fr' ? 'Monture suivante' : 'الإطار التالي'}>
-              <ArrowRight size={19} aria-hidden="true" />
-            </button>
+              <p className={styles.frameName} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px' }}>
+                {frame.name}
+              </p>
+            </Link>
+            <p className={styles.frameDesc}>{frame.description}</p>
           </div>
 
-          <div className={styles.selector} role="group"
-            aria-label={language === 'fr' ? 'Choisir une forme' : 'اختار شكل الإطار'}>
-            {stylesList.map((item, index) => (
-              <button type="button" key={item.id} aria-pressed={index === current} onClick={() => setCurrent(index)}>
-                <span className={styles.miniFrame}>{item.shape}</span>
-                <span>{item.name}</span>
-              </button>
-            ))}
-          </div>
+          <button type="button" className={styles.navBtn} onClick={next} aria-label={language === 'fr' ? 'Monture suivante' : 'الإطار التالي'}>
+            <ArrowRight size={20} />
+          </button>
         </div>
+      </div>
+
+      {/* Dots */}
+      <div className={styles.dots} role="group" aria-label={language === 'fr' ? 'Choisir une forme' : 'اختار شكل الإطار'}>
+        {stylesList.map((f, i) => (
+          <button
+            key={f.id}
+            className={`${styles.dot} ${i === current ? styles.dotActive : ''}`}
+            onClick={() => setCurrent(i)}
+            type="button"
+            aria-pressed={i === current}
+            aria-label={f.name}
+          />
+        ))}
       </div>
     </section>
   );
