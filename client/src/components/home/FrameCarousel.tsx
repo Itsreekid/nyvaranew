@@ -2,12 +2,12 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslation } from '@/locales/dictionary';
 import styles from './FrameCarousel.module.css';
 
-const FRAME_STYLES = (t: any) => [
+const FRAME_STYLES = (t: (path: string) => string) => [
   {
     id: 'square-classic',
     originalName: 'Carree',
@@ -92,20 +92,17 @@ export default function FrameCarousel() {
   const frame = stylesList[current];
 
   return (
-    <section className={styles.section}>
+    <section className={styles.section} aria-labelledby="frame-carousel-title" dir={language === 'fr' ? 'ltr' : 'rtl'}>
       <div className={styles.inner}>
         <div className={styles.textCol}>
-          <h2 className={styles.headline}>{language === 'fr' ? 'Trouvez votre monture' : 'اختار الإطار اللي يناسبك'}</h2>
-          <p className={styles.sub} style={{ whiteSpace: 'pre-line' }}>
-            {t('slider.sub')}
-          </p>
-          <button 
-            className={styles.cta} 
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('openQuizModal'));
-            }}
-          >
+          <h2 id="frame-carousel-title" className={styles.headline}>
+            {language === 'fr' ? 'Trouvez votre monture' : 'اختار الإطار اللي يناسبك'}
+          </h2>
+          <p className={styles.sub}>{t('slider.sub')}</p>
+          <button type="button" className={styles.cta}
+            onClick={() => window.dispatchEvent(new CustomEvent('openQuizModal'))}>
             {t('slider.customizeBtn')}
+            <ArrowUpRight size={17} aria-hidden="true" />
           </button>
         </div>
 
@@ -114,6 +111,7 @@ export default function FrameCarousel() {
             const touch = event.touches[0];
             touchStart.current = { x: touch.clientX, y: touch.clientY };
           }}
+          onTouchCancel={() => { touchStart.current = null; }}
           onTouchEnd={event => {
             const start = touchStart.current;
             touchStart.current = null;
@@ -123,42 +121,39 @@ export default function FrameCarousel() {
             if (Math.abs(offset) < 45 || Math.abs(offset) <= Math.abs(touch.clientY - start.y)) return;
             ((offset < 0) === (language === 'fr') ? next : prev)();
           }}>
-          {/* Navigation */}
-          <button className={styles.navBtn} onClick={prev} aria-label="Previous frame">
-            <ArrowLeft size={20} />
-          </button>
+          <div className={styles.stage}>
+            <button type="button" className={styles.navBtn} onClick={prev}
+              aria-label={language === 'fr' ? 'Monture précédente' : 'الإطار السابق'}>
+              <ArrowLeft size={19} aria-hidden="true" />
+            </button>
 
-          {/* Frame display */}
-          <div className={styles.frameDisplay} key={frame.id}>
-            <Link href={`/shop?frame_shape=${encodeURIComponent(frame.originalName)}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-              <div className={styles.frameSvgWrap} style={{ cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'scale(1.02)' } } as React.CSSProperties}>
-                {frame.shape}
+            <div className={styles.frameDisplay}>
+              <div className={styles.frameSvgWrap}>{frame.shape}</div>
+              <div aria-live="polite" aria-atomic="true">
+                <h3 className={styles.frameName}>{frame.name}</h3>
+                <p className={styles.frameDesc}>{frame.description}</p>
               </div>
-              <p className={styles.frameName} style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '4px' }}>
-                {frame.name}
-              </p>
-            </Link>
-            <p className={styles.frameDesc}>{frame.description}</p>
+              <Link className={styles.shopLink} href={`/shop?frame_shape=${encodeURIComponent(frame.originalName)}`}>
+                {language === 'fr' ? 'Voir les montures' : 'شوف الإطارات'}
+                <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+            </div>
+
+            <button type="button" className={styles.navBtn} onClick={next}
+              aria-label={language === 'fr' ? 'Monture suivante' : 'الإطار التالي'}>
+              <ArrowRight size={19} aria-hidden="true" />
+            </button>
           </div>
 
-          <button className={styles.navBtn} onClick={next} aria-label="Next frame">
-            <ArrowRight size={20} />
-          </button>
+          <div className={styles.selector} role="group"
+            aria-label={language === 'fr' ? 'Choisir une forme' : 'اختار شكل الإطار'}>
+            {stylesList.map((item, index) => (
+              <button type="button" key={item.id} aria-pressed={index === current} onClick={() => setCurrent(index)}>
+                {item.name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Dots */}
-      <div className={styles.dots} role="tablist" aria-label="Frame style selector">
-        {stylesList.map((f, i) => (
-          <button
-            key={f.id}
-            className={`${styles.dot} ${i === current ? styles.dotActive : ''}`}
-            onClick={() => setCurrent(i)}
-            role="tab"
-            aria-selected={i === current}
-            aria-label={f.name}
-          />
-        ))}
       </div>
     </section>
   );

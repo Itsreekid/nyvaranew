@@ -45,9 +45,9 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection settings={settings as HeroSettings} hasCategories={collections.length > 0} />
+      <FrameCarousel />
       <HomeCategories collections={collections} />
       <FeaturedProducts />
-      <FrameCarousel />
     </>
   );
 }
