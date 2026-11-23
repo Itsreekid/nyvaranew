@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -80,6 +80,7 @@ const FRAME_STYLES = (t: any) => [
 
 export default function FrameCarousel() {
   const [current, setCurrent] = useState(0);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
   
@@ -92,36 +93,36 @@ export default function FrameCarousel() {
 
   return (
     <section className={styles.section}>
-      {/* Background watermark text */}
-      <span className={styles.watermark} aria-hidden="true">
-        {frame.name.toUpperCase()}
-      </span>
-
       <div className={styles.inner}>
         <div className={styles.textCol}>
-          <p className={styles.eyebrow}>{t('slider.eyebrow')}</p>
-          <h2 className={styles.headline} style={{ whiteSpace: 'pre-line' }}>{t('slider.title')}</h2>
+          <h2 className={styles.headline}>{language === 'fr' ? 'Trouvez votre monture' : 'اختار الإطار اللي يناسبك'}</h2>
           <p className={styles.sub} style={{ whiteSpace: 'pre-line' }}>
             {t('slider.sub')}
           </p>
           <button 
             className={styles.cta} 
             onClick={() => {
-              // Open modal and pass the suggested frame shape mapping
-              // Carree -> square, Rond Classique -> round, Aviateur -> aviator, Oeil-de-chat -> heart (closest match for cat-eye in FindYourFit)
-              let faceShape = 'round'; // fallback
-              if (frame.originalName === 'Carree') faceShape = 'square';
-              else if (frame.originalName === 'Rond Classique') faceShape = 'round';
-              else if (frame.originalName === 'Aviateur') faceShape = 'heart';
-              else if (frame.originalName === 'Oeil-de-chat') faceShape = 'heart';
-              window.dispatchEvent(new CustomEvent('openQuizModal', { detail: { faceShape } }));
+              window.dispatchEvent(new CustomEvent('openQuizModal'));
             }}
           >
             {t('slider.customizeBtn')}
           </button>
         </div>
 
-        <div className={styles.carouselCol}>
+        <div className={styles.carouselCol}
+          onTouchStart={event => {
+            const touch = event.touches[0];
+            touchStart.current = { x: touch.clientX, y: touch.clientY };
+          }}
+          onTouchEnd={event => {
+            const start = touchStart.current;
+            touchStart.current = null;
+            if (!start) return;
+            const touch = event.changedTouches[0];
+            const offset = touch.clientX - start.x;
+            if (Math.abs(offset) < 45 || Math.abs(offset) <= Math.abs(touch.clientY - start.y)) return;
+            ((offset < 0) === (language === 'fr') ? next : prev)();
+          }}>
           {/* Navigation */}
           <button className={styles.navBtn} onClick={prev} aria-label="Previous frame">
             <ArrowLeft size={20} />

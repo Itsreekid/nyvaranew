@@ -1,49 +1,37 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import ProductCard from '@/components/shop/ProductCard';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useFeaturedProducts } from '@/hooks/useProducts';
 import { useLanguage } from '@/context/LanguageContext';
-import { getTranslation } from '@/locales/dictionary';
+import { getProductColors, isProductOutOfStock } from '@/lib/product-availability';
 import styles from './FeaturedProducts.module.css';
 
 export default function FeaturedProducts() {
-  const { products, loading } = useFeaturedProducts(6);
+  const { products, loading } = useFeaturedProducts(36);
   const { language } = useLanguage();
-  const t = (path: string) => getTranslation(language, path);
+  const fr = language === 'fr';
+  const available = products.filter(product => !isProductOutOfStock(product, getProductColors(product.color_options)));
+  const categories = new Set<string | null>();
+  const picks = available.filter(product => {
+    if (categories.has(product.category_id)) return false;
+    categories.add(product.category_id);
+    return true;
+  }).slice(0, 6);
+  const selection = [...picks, ...available.filter(product => !picks.includes(product))].slice(0, 6);
 
+  if (!loading && !selection.length) return null;
   return (
-    <section className={styles.section} id="featured">
+    <section className={styles.section} id="featured" aria-labelledby="featured-title">
       <div className={styles.inner}>
-        {/* Header */}
         <div className={styles.header}>
-          <div>
-            <p className={styles.eyebrow}>{t('featured.eyebrow')}</p>
-            <h2 className={styles.headline} style={{ whiteSpace: 'pre-line' }}>{t('featured.title')}</h2>
-          </div>
-          <Link href="/shop" className={styles.viewAll}>
-            {t('featured.viewAll')} {language === 'fr' ? <ArrowRight size={16} /> : <ArrowRight size={16} style={{ transform: 'rotate(180deg)' }} />}
-          </Link>
+          <h2 className={styles.headline} id="featured-title">{fr ? 'À découvrir' : 'قطع تستحق تكتشفها'}</h2>
+          <Link href="/shop" className={styles.viewAll}>{fr ? 'Voir toute la boutique' : 'شوف المتجر الكل'}</Link>
         </div>
-
-        {/* Grid */}
-        {loading ? (
-          <div className={styles.loadingWrap}>
-            <LoadingSpinner size="lg" color="gold" />
-          </div>
-        ) : products.length === 0 ? (
-          <div className={styles.emptyWrap}>
-            <p className={styles.emptyText}>{t('featured.emptyText')}</p>
-          </div>
-        ) : (
-          <div className={styles.grid}>
-            {products.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
+        <div className={styles.grid} aria-busy={loading}>
+          {loading ? Array.from({ length: 6 }, (_, index) => <div key={index} className={styles.placeholder} />)
+            : selection.map(product => <ProductCard key={product.id} product={product} />)}
+        </div>
       </div>
     </section>
   );

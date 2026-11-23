@@ -218,14 +218,13 @@ export default function Navbar() {
               )}
             </button>
             </div>
-            {NAV_LINKS.map((link, i) => (
+            {NAV_LINKS.map(link => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`${styles.mobileLink} ${pathname === link.href ? styles.activeMobile : ''}`}
                 onClick={() => setMenuOpen(false)}
               >
-                <span className={styles.mobileLinkNum}>0{i + 1}</span>
                 {t(link.key)}
                 <span className={styles.mobileLinkArrow}>
                   <ArrowRight size={20} />
@@ -241,8 +240,12 @@ export default function Navbar() {
               {language === 'fr' ? 'Rechercher' : 'لوج على'}
             </button>
 
+            <Link href="/#categories" onClick={() => setMenuOpen(false)} className={styles.mobileExtraLink}>
+              {language === 'fr' ? 'Collections' : 'المجموعات'}
+            </Link>
+
             {/* Find Your Fit — mobile */}
-            <FindYourFitMobileButton onClick={() => { setFitOpen(true); setMenuOpen(false); }} label={t('quiz.mobileTrigger')} />
+            <FindYourFitMobileButton onClick={() => { setFitOpen(true); setMenuOpen(false); }} label={language === 'fr' ? 'Quiz Morphologie · Lunettes' : 'اختبار شكل الوجه للنظارات'} />
 
             <Link
               href="/wishlist"

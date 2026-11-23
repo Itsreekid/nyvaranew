@@ -1,109 +1,70 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowDown, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { getTranslation } from '@/locales/dictionary';
 import styles from './HeroSection.module.css';
 
-export default function HeroSection({ settings }: { settings?: any }) {
+export interface HeroSettings {
+  hero_title?: string | null;
+  hero_subtitle?: string | null;
+  hero_image_url?: string | null;
+  hero_cta1_label?: string | null;
+  hero_cta2_label?: string | null;
+  hero_badge?: string | null;
+  hero_image_badge?: string | null;
+  hero_stat1_value?: string | null;
+  hero_stat1_label?: string | null;
+  hero_stat2_value?: string | null;
+  hero_stat2_label?: string | null;
+  hero_stat3_value?: string | null;
+  hero_stat3_label?: string | null;
+}
+
+export default function HeroSection({ settings, hasCategories }: { settings?: HeroSettings; hasCategories: boolean }) {
   const { language } = useLanguage();
-  const t = (path: string) => getTranslation(language, path);
+  const fr = language === 'fr';
+  const title = settings?.hero_title?.trim();
+  const description = settings?.hero_subtitle?.trim();
+  const badge = settings?.hero_badge?.trim();
+  const imageBadge = settings?.hero_image_badge?.trim();
+  const secondaryLabel = settings?.hero_cta2_label?.trim();
+  const stats = [1, 2, 3].map(index => {
+    const slot = index as 1 | 2 | 3;
+    const value = settings?.[`hero_stat${slot}_value`]?.trim();
+    const label = settings?.[`hero_stat${slot}_label`]?.trim();
+    const legacy = ['200+ MODÈLES', '100% ARTISANAL', '48H LIVRAISON'];
+    return value && label && !legacy.includes((value + ' ' + label).toUpperCase()) ? { value, label, slot } : null;
+  }).filter(stat => stat !== null);
 
-  const titleSplit = (settings?.hero_title || '').split('autrement.');
-  const hasSplit = titleSplit.length > 1 || (settings?.hero_title || '').includes('autrement.');
-  
   return (
-    <section className={styles.hero} aria-label="Hero">
-
-      <div className={styles.bgBase} aria-hidden="true" />
-      <div className={styles.bgGlow1} aria-hidden="true" />
-      <div className={styles.bgGlow2} aria-hidden="true" />
-      <div className={styles.bgGrid}  aria-hidden="true" />
-
+    <section className={styles.hero} aria-labelledby="home-title">
       <div className={styles.inner}>
-
-        <div className={styles.textCol}>
-
-          <div className={styles.badge}>
-            <Sparkles size={11} />
-            <span>{settings?.hero_badge || t('hero.badge')}</span>
-          </div>
-
-          <h1 className={styles.headline}>
-            {hasSplit ? (
-               <>
-                 <span className={styles.headlineTop}>{settings?.hero_title.replace('autrement.', '').trim()} </span>
-                 <span className={styles.headlineAccent}>autrement.</span>
-               </>
-            ) : (
-               <span className={styles.headlineTop}>{settings?.hero_title || t('hero.title1')}</span>
-            )}
-          </h1>
-
-          <p className={styles.subline} style={{ whiteSpace: 'pre-line' }}>
-            {settings?.hero_subtitle || (t('hero.sub1') + '\n' + t('hero.sub2'))}
+        <div className={styles.text}>
+          <p className={styles.eyebrow}>{badge && badge !== 'NOUVELLE COLLECTION 2026' ? badge : fr ? 'Nyvara · Boutique' : 'نيفارا · بوتيك'}</p>
+          <h1 id="home-title">{title && title !== 'Voir le monde autrement.' ? title : fr ? 'L’élégance à votre façon.' : 'الأناقة بطريقتك.'}</h1>
+          <p className={styles.description}>
+            {description && !description.startsWith('Des lunettes de luxe taillées pour les visionnaires.')
+              ? description
+              : fr ? 'Lunettes, montres et accessoires pour affirmer votre style.' : 'نظارات وساعات وإكسسوارات تعبّر على ستايلك.'}
           </p>
-
-          <div className={styles.stats}>
-            <div className={styles.statItem}>
-              <span className={styles.statNum}>{settings?.hero_stat1_value || '200+'}</span>
-              <span className={styles.statLabel}>{settings?.hero_stat1_label || t('hero.stat1')}</span>
-            </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={styles.statNum}>{settings?.hero_stat2_value || '100%'}</span>
-              <span className={styles.statLabel}>{settings?.hero_stat2_label || t('hero.stat2')}</span>
-            </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={styles.statNum}>{settings?.hero_stat3_value || '48h'}</span>
-              <span className={styles.statLabel}>{settings?.hero_stat3_label || t('hero.stat3')}</span>
-            </div>
-          </div>
-
           <div className={styles.actions}>
-            <Link href="/shop" className={styles.primaryCta}>
-              <span>{settings?.hero_cta1_label || t('hero.primaryCta')}</span>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+            <Link href="/shop" className={styles.primary}>
+              {settings?.hero_cta1_label && settings.hero_cta1_label !== 'DÉCOUVRIR'
+                ? settings.hero_cta1_label : fr ? 'Découvrir la collection' : 'اكتشف المجموعة'}
             </Link>
-            <Link href="/shop" className={styles.secondaryCta}>
-              {settings?.hero_cta2_label || t('hero.secondaryCta')}
-            </Link>
+            {hasCategories && <Link href="#categories" className={styles.secondary}>
+              {secondaryLabel && secondaryLabel !== 'EXPLORER LA COLLECTION' ? secondaryLabel : fr ? 'Explorer les catégories' : 'تصفّح الأقسام'}
+            </Link>}
           </div>
+          {stats.length > 0 && <dl className={styles.stats}>
+            {stats.map(stat => <div key={stat.slot}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}
+          </dl>}
         </div>
-
-        <div className={styles.visual} aria-hidden="false">
-          <div className={styles.imageWrap}>
-
-            <div className={styles.ringOuter} aria-hidden="true" />
-            <div className={styles.ringInner} aria-hidden="true" />
-
-            <div className={styles.cornerTL} aria-hidden="true" />
-            <div className={styles.cornerBR} aria-hidden="true" />
-
-            <Image
-              src={settings?.hero_image_url || "/hero-model.png"}
-              alt="Modèle portant des lunettes de soleil Nyvara"
-              fill
-              priority
-              fetchPriority="high"
-              sizes="(max-width: 900px) 100vw, 55vw"
-              className={styles.modelImg}
-            />
-
-            <div className={styles.imgOverlay} aria-hidden="true" />
-
-            <div className={styles.floatTag}>
-              <span className={styles.floatTagDot} />
-              <span>{settings?.hero_image_badge || t('hero.tag')}</span>
-            </div>
-
-            <div className={styles.yearMark} aria-hidden="true">2026</div>
-          </div>
+        <div className={styles.photo}>
+          <Image src={settings?.hero_image_url || '/hero-model.png'} alt={fr ? 'Campagne de la boutique Nyvara' : 'مجموعة نيفارا'}
+            fill priority sizes="(max-width: 700px) 100vw, 52vw" />
+          {imageBadge && imageBadge !== 'COLLECTION EXCLUSIVE 2026' && <span className={styles.imageBadge}>{imageBadge}</span>}
         </div>
       </div>
     </section>

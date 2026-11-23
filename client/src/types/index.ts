@@ -5,6 +5,7 @@ export type Gender = 'homme' | 'femme' | 'unisex' | 'enfant';
 export interface Category {
   id: string;
   name: string | null;
+  homepage_config?: import('../lib/category-icons').CategoryHomepageConfig | null;
 }
 
 export interface QuantityBreak {

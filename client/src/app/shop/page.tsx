@@ -41,11 +41,14 @@ function ShopContent() {
   const initialMinPrice = searchParams.has('min_price') ? Number(searchParams.get('min_price')) : undefined;
   const initialMaxPrice = searchParams.has('max_price') ? Number(searchParams.get('max_price')) : undefined;
   const urlCategorySlug = searchParams.get('category');
+  const directCategory = urlCategorySlug && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(urlCategorySlug)
+    ? urlCategorySlug : undefined;
   const initialSort = (searchParams.get('sort') as SortOption) ?? 'newest';
   const initialFrameShape = searchParams.get('frame_shape') ?? undefined;
 
   const [filters, setFilters] = useState<ProductFilters & { page?: number; pageSize?: number }>({
     gender: initialGender,
+    category_id: directCategory,
     search: initialSearch,
     min_price: initialMinPrice,
     max_price: initialMaxPrice,
@@ -56,14 +59,17 @@ function ShopContent() {
   const [sort, setSort] = useState<SortOption>(initialSort);
 
   useEffect(() => {
-    if (urlCategorySlug && categories.length > 0 && !filters.category_id) {
+    if (directCategory) {
+      setFilters(previous => previous.category_id === directCategory ? previous : { ...previous, category_id: directCategory, page: 0 });
+    } else if (!urlCategorySlug) {
+      setFilters(previous => previous.category_id ? { ...previous, category_id: undefined, page: 0 } : previous);
+    } else if (categories.length > 0) {
       const matched = categories.find(c => (c.name && toSlug(c.name) === urlCategorySlug) || c.id === urlCategorySlug);
       if (matched) {
-        setFilters(f => ({ ...f, category_id: matched.id, page: 0 }));
+        setFilters(f => f.category_id === matched.id ? f : { ...f, category_id: matched.id, page: 0 });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, urlCategorySlug]);
+  }, [categories, directCategory, urlCategorySlug]);
 
   const { products, loading, error, totalCount } = useProducts(filters, sort, true);
 
@@ -83,16 +89,8 @@ function ShopContent() {
     if (newFilters.max_price !== undefined) params.set('max_price', String(newFilters.max_price));
     else params.delete('max_price');
 
-    if (newFilters.category_id) {
-       const matched = categories.find(c => c.id === newFilters.category_id);
-       if (matched && matched.name) {
-         params.set('category', toSlug(matched.name));
-       } else {
-         params.set('category', newFilters.category_id);
-       }
-    } else {
-       params.delete('category');
-    }
+    if (newFilters.category_id) params.set('category', newFilters.category_id);
+    else params.delete('category');
 
     if (newFilters.frame_shape) params.set('frame_shape', newFilters.frame_shape);
     else params.delete('frame_shape');
@@ -108,10 +106,10 @@ function ShopContent() {
   };
 
   const handleReset = useCallback(() => {
-    updateFilters({ gender: 'all', page: 0, pageSize: 20 });
-    updateSort('newest');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, pathname, categories, router]);
+    setFilters({ gender: 'all', page: 0, pageSize: 20 });
+    setSort('newest');
+    router.replace(pathname, { scroll: false });
+  }, [pathname, router]);
 
   const totalPages = Math.ceil((totalCount || 0) / (filters.pageSize || 20));
 

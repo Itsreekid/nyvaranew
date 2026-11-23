@@ -95,7 +95,7 @@ export function useFeaturedProducts(limit = 6) {
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    fetch(`/api/products?pageSize=${limit}&sort=newest`)
+    fetch(`/api/products?pageSize=${limit}&sort=newest&outOfStockLast=true`)
       .then(r => r.json())
       .then(({ data }) => { setProducts((data as Product[]) ?? []); setLoading(false); })
       .catch(() => setLoading(false));

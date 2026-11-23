@@ -128,3 +128,15 @@
   font-size: 13px;
   cursor: pointer;
 }
+.categoryForm { display: grid; gap: 14px; width: min(100%, 640px); }
+.categoryForm label { display: grid; gap: 6px; font-size: .875rem; }
+.homeOptions { display: flex; flex-wrap: wrap; gap: 12px; }
+.homeOptions label { flex: 1 1 180px; min-width: 0; }
+.iconPicker { border: 1px solid #ddd5c8; border-radius: 10px; padding: 10px; }
+.iconPicker summary { cursor: pointer; font-size: .875rem; }
+.iconPicker summary svg { display: inline-block; vertical-align: middle; margin-inline-end: 5px; }
+.iconSearch { grid-template-columns: auto minmax(0, 1fr); align-items: center; margin-top: 8px; }
+.iconGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%,120px),1fr)); gap: 6px; margin-top: 8px; }
+.iconGrid button { display: grid; place-items: center; gap: 4px; min-height: 50px; padding: 6px; font-size: .8125rem; border: 1px solid #ddd5c8; border-radius: 6px; }
+.iconGrid button[aria-pressed='true'] { background: #f5e8d1; border-color: #956b37; color: #382414; }
+.categoryIdentity { display: flex; align-items: center; gap: 8px; min-width: 0; }

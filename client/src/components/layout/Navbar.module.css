@@ -45,6 +45,7 @@
   transition: opacity var(--transition-fast);
   z-index: 1;
 }
+.logo img { width: 70px; height: auto; }
 .logo:hover { opacity: 0.7; }
 
 /* ─── Nav Links (desktop) ─────────────────────────────────── */
@@ -56,7 +57,7 @@
 .navLinks {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: clamp(12px, 1.8vw, 26px);
 }
 .langToggleBtn {
   font-size: 11px;
@@ -345,6 +346,7 @@
   .hamburger    { display: flex; }
   .hideOnMobile { display: none !important; }
   .logo         { font-size: 1.25rem; }
+  .logo img     { width: 60px; }
   .inner        { padding: 0 16px; justify-content: center; }
   /* Cart + hamburger pushed to the right */
   .actions      { position: absolute; right: 16px; margin-left: 0; gap: 2px; }

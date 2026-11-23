@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
       {
         source: '/api/categories',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=172800' }, // 1 day
+          { key: 'Cache-Control', value: 'no-store, max-age=0' }, // 1 day
         ],
       },
       // Cache images for 1 year (they have content-based URLs)

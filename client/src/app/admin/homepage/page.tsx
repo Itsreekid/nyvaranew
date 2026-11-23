@@ -1,12 +1,14 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { Loader2, Save, Home, ChevronDown, ChevronUp } from 'lucide-react';
 import ImageUpload from '@/components/admin/ImageUpload';
+import CategoryManager from '@/components/admin/CategoryManager';
 
 export default function HomepageSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
   const [openSections, setOpenSections] = useState({ hero: true });
   
   const [settings, setSettings] = useState<any>({
@@ -74,7 +76,7 @@ export default function HomepageSettingsPage() {
         <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#1B1B1B' }}>Paramètres Accueil</h1>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || uploadingHero}
           style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             background: '#1A1A1A', color: '#C9A96E', border: '1px solid #C9A96E',
@@ -83,7 +85,7 @@ export default function HomepageSettingsPage() {
           }}
         >
           {saving ? <Loader2 size={18} className="lucide-spin" /> : <Save size={18} />}
-          Enregistrer
+          Enregistrer le hero
         </button>
       </div>
 
@@ -118,6 +120,7 @@ export default function HomepageSettingsPage() {
               </div>
 
               <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '24px 0 12px 0', borderBottom: '1px solid #EEE', paddingBottom: '8px' }}>Statistiques</h3>
+              <p style={{ marginBottom: '12px', fontSize: '14px' }}>Renseignez uniquement des chiffres vérifiés. Les anciennes valeurs d’exemple restent masquées.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>Stat 1 - Valeur (ex: 200+)</label>
@@ -146,7 +149,7 @@ export default function HomepageSettingsPage() {
                   <input type="text" name="hero_cta1_label" value={settings.hero_cta1_label || ''} onChange={handleChange} style={inputStyle} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Bouton 2 (ex: EXPLORER LA COLLECTION)</label>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Bouton 2 (vers les catégories)</label>
                   <input type="text" name="hero_cta2_label" value={settings.hero_cta2_label || ''} onChange={handleChange} style={inputStyle} />
                 </div>
               </div>
@@ -161,7 +164,7 @@ export default function HomepageSettingsPage() {
                 <ImageUpload
                   value={settings.hero_image_url || ''}
                   onChange={(url) => setSettings({ ...settings, hero_image_url: url })}
-                  onUploading={() => {}}
+                  onUploading={setUploadingHero}
                   folder="gallery" requireSquare={false}
                 />
               </div>
@@ -169,6 +172,13 @@ export default function HomepageSettingsPage() {
             </div>
           )}
         </div>
+        <details style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #eee' }}>
+          <summary style={{ cursor: 'pointer', fontSize: '18px', fontWeight: 700 }}>Catégories de l’accueil</summary>
+          <p style={{ margin: '12px 0 20px', color: '#5d554a', fontSize: '14px' }}>
+            Ajoutez des catégories et réglez leur icône, leur visibilité et leur ordre sur l’accueil. Chaque catégorie s’enregistre séparément.
+          </p>
+          <CategoryManager />
+        </details>
       </div>
     </div>
   );
