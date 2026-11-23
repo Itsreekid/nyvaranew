@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { X, Edit, Trash2 } from 'lucide-react';
+import { X, Edit, Trash2, Search, Plus } from 'lucide-react';
 import { showAdminError } from '@/lib/admin-error';
 import { showAdminSuccess } from '@/lib/admin-success';
 import styles from './OrderDetailsDrawer.module.css';
@@ -25,11 +25,17 @@ const CITIES = [
   'Sfax', 'Sidi Bouzid', 'Siliana', 'Sousse', 'Tataouine', 'Tozeur', 'Tunis', 'Zaghouan'
 ];
 
+type CatalogProduct = NonNullable<OrderItem['products']>;
+
+function searchKey(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/œ/g, 'oe');
+}
+
 interface EditableItem extends OrderItem {
   custom_price: number;
 }
 
-function getUnitPrice(item: OrderItem): number {
+function getUnitPrice(item: Pick<OrderItem, 'products' | 'quantity_break_price'>): number {
   if (item.quantity_break_price != null) return item.quantity_break_price;
   if (item.products?.discount != null && item.products.discount > 0) {
     return Math.round((item.products.price ?? 0) * (1 - item.products.discount / 100));
@@ -67,7 +73,10 @@ export default function OrderDetailsDrawer({
     customer_name: '', phone: '', city: '', address: '', customer_email: '', private_note: '', country: 'TN'
   });
   const [editableItems, setEditableItems] = React.useState<EditableItem[]>([]);
-  const [products, setProducts] = React.useState<any[]>([]);
+  const [products, setProducts] = React.useState<CatalogProduct[] | null>(null);
+  const [productQuery, setProductQuery] = React.useState('');
+  const [catalogError, setCatalogError] = React.useState(false);
+  const [catalogAttempt, setCatalogAttempt] = React.useState(0);
   const [openPickerId, setOpenPickerId]   = React.useState<string | null>(null);
   const pickerRef = React.useRef<HTMLDivElement>(null);
 
@@ -84,12 +93,23 @@ export default function OrderDetailsDrawer({
       setActiveTab('summary');
       setHistoryOrders([]);
       setExpandedHistoryId(null);
-    } else if (isOpen && (mode === 'create' || isEditing) && products.length === 0) {
-      fetch('/api/products?sort=name_asc&noLimit=true', { cache: 'no-store' })
-        .then(r => r.json())
-        .then(({ data }) => { if (data) setProducts(data); });
+      setProductQuery('');
     }
-  }, [isOpen, mode, isEditing, products.length]);
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen || (mode !== 'create' && !isEditing) || products !== null) return;
+    const controller = new AbortController();
+    setCatalogError(false);
+    void fetch('/api/products?sort=name_asc&noLimit=true', { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        const { data } = await response.json();
+        if (!response.ok || !Array.isArray(data)) throw new Error('Catalogue indisponible');
+        if (!controller.signal.aborted) setProducts(data);
+      })
+      .catch(() => { if (!controller.signal.aborted) setCatalogError(true); });
+    return () => controller.abort();
+  }, [isOpen, mode, isEditing, products, catalogAttempt]);
 
   React.useEffect(() => {
     if (activeTab === 'history' && order?.phone) {
@@ -152,6 +172,26 @@ export default function OrderDetailsDrawer({
   const handleDeleteItem = (id: string) => {
     if (confirm('Voulez-vous supprimer ce produit de la commande ?'))
       setEditableItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  const searchTerms = searchKey(productQuery.trim()).split(/\s+/).filter(Boolean);
+  const matchingProducts = searchTerms.length ? (products ?? []).filter(product => {
+    const name = searchKey(product.title ?? '');
+    return searchTerms.every(term => name.includes(term));
+  }) : [];
+  const addProduct = (product: CatalogProduct) => {
+    setEditableItems(previous => [...previous, {
+      id: `temp_${crypto.randomUUID()}`,
+      product_id: product.id,
+      quantity: 1,
+      custom_price: getUnitPrice({ products: product, quantity_break_price: null }),
+      quantity_break_price: null,
+      selected_color_name: null,
+      selected_color_hex1: null,
+      selected_color_hex2: null,
+      products: product,
+    }]);
+    setProductQuery('');
   };
 
   const viewItems  = order.order_items ?? [];
@@ -596,28 +636,48 @@ export default function OrderDetailsDrawer({
                 {isEditing && (
                   <tr className={styles.tableRow}>
                     <td colSpan={6} style={{ padding: '8px 16px' }}>
-                      <select 
-                        className={styles.selectInput}
-                        style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px dashed rgba(255,255,255,0.2)', cursor: 'pointer' }}
-                        defaultValue=""
-                        onChange={e => {
-                          const p = products.find(x => x.id === e.target.value);
-                          if (p) {
-                            const initialPrice = getUnitPrice({ products: p } as unknown as OrderItem);
-                            setEditableItems(prev => [...prev, {
-                              id: `temp_${Math.random()}`,
-                              product_id: p.id,
-                              quantity: 1,
-                              custom_price: initialPrice,
-                              products: p,
-                            } as unknown as EditableItem]);
-                          }
-                          e.target.value = "";
-                        }}
-                      >
-                        <option value="" disabled>+ Ajouter un produit...</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                      </select>
+                      <div className={styles.productSearch}>
+                        <label className={styles.productSearchField}>
+                          <Search size={16} aria-hidden="true" />
+                          <input
+                            type="search"
+                            placeholder="Rechercher un produit par nom…"
+                            aria-label="Rechercher un produit par nom"
+                            value={productQuery}
+                            onChange={event => setProductQuery(event.target.value)}
+                            onKeyDown={event => {
+                              if (event.key === 'Enter' && matchingProducts.length === 1) {
+                                event.preventDefault();
+                                addProduct(matchingProducts[0]);
+                              }
+                            }}
+                          />
+                        </label>
+                        {catalogError ? (
+                          <button type="button" className={styles.catalogRetry} onClick={() => setCatalogAttempt(attempt => attempt + 1)}>
+                            Catalogue indisponible. Réessayer
+                          </button>
+                        ) : products === null ? (
+                          <p className={styles.productSearchHint} role="status">Chargement du catalogue…</p>
+                        ) : searchTerms.length > 0 && (
+                          matchingProducts.length === 0
+                            ? <p className={styles.productSearchHint} role="status">Aucun produit trouvé.</p>
+                            : <>
+                              <ul className={styles.productMatches}>
+                                {matchingProducts.slice(0, 6).map(product => (
+                                  <li key={product.id}>
+                                    <button type="button" onClick={() => addProduct(product)}>
+                                      <Plus size={15} aria-hidden="true" />
+                                      <span>{product.title}</span>
+                                      <span className={styles.productMatchPrice}>{Number(getUnitPrice({ products: product, quantity_break_price: null })).toFixed(3)} TND</span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                              {matchingProducts.length > 6 && <p className={styles.productSearchHint} role="status">6 sur {matchingProducts.length} produits. Affinez la recherche.</p>}
+                            </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )}

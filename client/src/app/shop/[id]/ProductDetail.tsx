@@ -179,15 +179,23 @@ export default function ProductDetail({ product, gallery, related, initialColorI
     imageWrapRef.current?.style.setProperty('--zoom-y', '50%');
   };
 
-  const handleThumbClick = (idx: number) => {
+  const showPhoto = (idx: number) => {
     setActivePhoto(allImages[idx] ?? null);
     setAutoPlayStopped(true);
+  };
+
+  const selectThumbnail = (index: number, color?: ColorOption) => {
+    showPhoto(index);
+    // Bundles have multiple color slots, so the customer chooses each one explicitly.
+    if (color && inStockBool && !adding && (!hasQuantityBreaks || qty === 1)) {
+      setSelectedColors([color]);
+    }
   };
 
   const selectColor = (color: ColorOption, index = 0) => {
     if (adding) return;
     setSelectedColors(previous => previous.map((selection, slot) => slot === index ? color : selection));
-    handleThumbClick(imageIndexForColor(color));
+    showPhoto(imageIndexForColor(color));
   };
 
   const validateColors = (): boolean => {
@@ -329,7 +337,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
                     src={activeImage}
                     alt={product.title ?? 'Sunglasses'}
                     fill
-                    className={styles.image}
+                    className={`${styles.image} ${imageSoldOut ? styles.soldOutImage : ''}`}
                     sizes="(max-width: 768px) 100vw, 50vw"
                     priority
                     fetchPriority="high"
@@ -365,7 +373,7 @@ export default function ProductDetail({ product, gallery, related, initialColorI
                   <button
                     key={idx}
                     className={`${styles.dot} ${idx === activeIdx ? styles.dotActive : ''}`}
-                    onClick={() => handleThumbClick(idx)}
+                    onClick={() => showPhoto(idx)}
                     aria-label={`Photo ${idx + 1}`}
                   />
                 ))}
@@ -376,16 +384,18 @@ export default function ProductDetail({ product, gallery, related, initialColorI
             {allImages.length > 1 && (
               <div className={styles.thumbnails}>
                 {allImages.map((src, idx) => {
-                  const outOfStock = isColorImageSoldOut(getImageColors(src, mainImage, safeColorOptions));
+                  const owners = getImageColors(src, mainImage, safeColorOptions);
+                  const outOfStock = isColorImageSoldOut(owners);
+                  const color = owners.length === 1 ? getPurchasableColor(safeColorOptions, owners[0].id) : undefined;
                   return (
                     <button
                       key={src + idx}
                       className={`${styles.thumb} ${idx === activeIdx ? styles.thumbActive : ''}`}
-                      onClick={() => handleThumbClick(idx)}
-                      aria-label={`Photo ${idx + 1}${outOfStock ? ` — ${t('product.soldOutPhoto')}` : ''}`}
+                      onClick={() => selectThumbnail(idx, color)}
+                      aria-label={`Photo ${idx + 1}${outOfStock ? ` — ${t('product.soldOutPhoto')}` : color ? ` — ${color.name}` : ''}`}
                       aria-pressed={idx === activeIdx}
                     >
-                      <Image src={src} alt="" fill className={styles.thumbImg} sizes="80px" loading="lazy" />
+                      <Image src={src} alt="" fill className={`${styles.thumbImg} ${outOfStock ? styles.soldOutThumb : ''}`} sizes="80px" loading="lazy" />
                       {outOfStock && <span className={styles.thumbStockLabel}>{t('product.soldOutPhoto')}</span>}
                     </button>
                   );

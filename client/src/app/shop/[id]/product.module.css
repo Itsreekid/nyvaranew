@@ -108,6 +108,8 @@
 .thumb:hover { border-color: var(--color-grey); transform: scale(1.04); }
 .thumbActive { border-color: var(--color-gold) !important; box-shadow: 0 0 0 1px var(--color-gold); }
 .thumbImg { object-fit: cover; }
+.soldOutImage { filter: blur(30px); }
+.soldOutThumb { filter: blur(12px); }
 
 .thumbStockLabel {
   position: absolute;

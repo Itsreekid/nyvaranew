@@ -267,6 +267,53 @@
   background: #140f1d;
   color: white;
 }
+.productSearch { max-width: 520px; }
+.productSearchField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.05);
+  color: #b8adca;
+}
+.productSearchField:focus-within { border-color: #9274cc; }
+.productSearchField input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: white;
+  font-size: 14px;
+}
+.productSearchHint, .catalogRetry { margin-top: 8px; font-size: 12px; color: #c5b9d0; }
+.catalogRetry { text-decoration: underline; }
+.productMatches {
+  list-style: none;
+  padding: 4px;
+  margin: 6px 0 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 7px;
+  background: #140f1d;
+}
+.productMatches button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  text-align: start;
+  color: white;
+  border-radius: 4px;
+}
+.productMatches button:is(:hover, :focus-visible) { background: rgba(146,116,204,0.2); }
+.productMatchPrice { white-space: nowrap; font-size: 12px; color: #c5b9d0; }
+
 .textareaInput {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
