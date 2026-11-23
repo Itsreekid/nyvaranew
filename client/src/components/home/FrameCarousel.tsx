@@ -149,7 +149,8 @@ export default function FrameCarousel() {
             aria-label={language === 'fr' ? 'Choisir une forme' : 'اختار شكل الإطار'}>
             {stylesList.map((item, index) => (
               <button type="button" key={item.id} aria-pressed={index === current} onClick={() => setCurrent(index)}>
-                {item.name}
+                <span className={styles.miniFrame}>{item.shape}</span>
+                <span>{item.name}</span>
               </button>
             ))}
           </div>
