@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { validatePurchase } from '@/lib/product-availability';
 import type { Product } from '@/types';
+import { MORPHOLOGY_NOT_SPECIFIED, normalizeMorphology } from '@/lib/morphology';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const b = await req.json();
+    const morphology = normalizeMorphology(b);
 
     const embedding = await generateProductEmbedding(b);
     const embeddingStr = embedding ? JSON.stringify(embedding) : null;
@@ -68,10 +70,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         quantity_breaks = ${b.quantity_breaks ? JSON.stringify(b.quantity_breaks) : null},
         is_active = ${b.is_active ?? true},
         allow_unlimited_stock = ${b.allow_unlimited_stock ?? false},
-        frame_shape = ${b.frame_shape ?? null},
-        style_vibe = ${b.style_vibe ?? null},
-        optical_fit = ${b.optical_fit ?? null},
-        ideal_faces = ${b.ideal_faces && Array.isArray(b.ideal_faces) ? sql.array(b.ideal_faces) : null},
+        frame_shape = ${'frame_shape' in b ? (b.frame_shape === MORPHOLOGY_NOT_SPECIFIED ? b.frame_shape : morphology.frame_shape) : sql`frame_shape`},
+        style_vibe = ${'style_vibe' in b ? (b.style_vibe === MORPHOLOGY_NOT_SPECIFIED ? b.style_vibe : morphology.style_vibe) : sql`style_vibe`},
+        optical_fit = ${'optical_fit' in b ? (b.optical_fit === MORPHOLOGY_NOT_SPECIFIED ? b.optical_fit : morphology.optical_fit) : sql`optical_fit`},
+        ideal_faces = ${'ideal_faces' in b ? (morphology.ideal_faces.length || Array.isArray(b.ideal_faces) ? sql.array(morphology.ideal_faces, 25) : null) : sql`ideal_faces`},
         embedding = COALESCE(${embeddingStr}, embedding)
       WHERE id = ${id} RETURNING *
     `;

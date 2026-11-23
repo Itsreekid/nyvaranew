@@ -51,6 +51,7 @@ export interface OrderWithItems extends Order {
 
 export default function AdminOrdersPage() {
   const [orders, setOrders]       = useState<OrderWithItems[]>([]);
+  const [ordersLoadFailed, setOrdersLoadFailed] = useState(false);
   const [loading, setLoading]     = useState(true);
   const [syncing, setSyncing]     = useState(false);
   const [lastSync, setLastSync]   = useState<Date | null>(null);
@@ -146,100 +147,103 @@ export default function AdminOrdersPage() {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchOrders = useCallback(async () => {
-    const from = page * pageSize;
-    const to   = from + pageSize - 1;
-
-    const _params = new URLSearchParams({
-      page: String(page), pageSize: String(pageSize), archived: String(viewArchived),
-    });
-    if (searchQuery.trim()) _params.set('search', searchQuery.trim());
-    if (statusFilter) _params.set('status', statusFilter);
-    const _fetchRes = await fetch('/api/orders?' + _params);
-    const _fetchJson = await _fetchRes.json();
-    const data = _fetchJson.data;
-    const count = _fetchJson.count;
-
-    if (data && data.length > 0) {
-      const normalizePhone = (p: string | null | undefined) => {
-        if (!p) return '';
-        let num = p.replace(/[^\d+]/g, '');
-        if (num.startsWith('+216')) return num.slice(4);
-        if (num.startsWith('00216')) return num.slice(5);
-        return num;
-      };
-
-      const phonesToQuery = new Set<string>();
-      data.forEach((o: Partial<Order>) => {
-        if (o.phone) {
-          const norm = normalizePhone(o.phone);
-          if (norm) {
-            phonesToQuery.add(norm);
-            phonesToQuery.add(`+216${norm}`);
-            phonesToQuery.add(`00216${norm}`);
-          }
-        }
+    setOrdersLoadFailed(false);
+    try {
+      const _params = new URLSearchParams({
+        page: String(page), pageSize: String(pageSize), archived: String(viewArchived),
       });
-      const phones = Array.from(phonesToQuery);
+      if (searchQuery.trim()) _params.set('search', searchQuery.trim());
+      if (statusFilter) _params.set('status', statusFilter);
+      const _fetchRes = await fetch('/api/orders?' + _params);
+      const _fetchJson = await _fetchRes.json();
+      if (!_fetchRes.ok || !Array.isArray(_fetchJson.data)) throw new Error('Orders request failed');
+      const data = _fetchJson.data;
+      const count = _fetchJson.count;
 
-      if (phones.length > 0) {
-        const _phoneRes = await fetch('/api/orders/phone-history', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phones })
-        });
-        const _phoneJson = await _phoneRes.json();
-        const allPhoneOrders = _phoneJson.data;
-        
-        const phoneData: Record<string, { count: number; hasDelivered: boolean; hasReturned: boolean }> = {};
-        if (allPhoneOrders) {
-          for (const row of allPhoneOrders as { phone?: string | null; call_status?: string | null }[]) {
-            if (row.phone) {
-              const norm = normalizePhone(row.phone);
-              if (!norm) continue;
-              if (!phoneData[norm]) {
-                phoneData[norm] = { count: 0, hasDelivered: false, hasReturned: false };
-              }
-              phoneData[norm].count += 1;
-              const status = row.call_status;
-              if (status === 'delivered') phoneData[norm].hasDelivered = true;
-              if (status === 'returned') phoneData[norm].hasReturned = true;
+      if (data && data.length > 0) {
+        const normalizePhone = (p: string | null | undefined) => {
+          if (!p) return '';
+          let num = p.replace(/[^\d+]/g, '');
+          if (num.startsWith('+216')) return num.slice(4);
+          if (num.startsWith('00216')) return num.slice(5);
+          return num;
+        };
+
+        const phonesToQuery = new Set<string>();
+        data.forEach((o: Partial<Order>) => {
+          if (o.phone) {
+            const norm = normalizePhone(o.phone);
+            if (norm) {
+              phonesToQuery.add(norm);
+              phonesToQuery.add(`+216${norm}`);
+              phonesToQuery.add(`00216${norm}`);
             }
           }
-        }
-        
-        const enrichedData = data.map((order: Order) => {
-          const norm = normalizePhone(order.phone);
-          return {
-            ...order,
-            customer_order_count: norm ? (phoneData[norm]?.count || 1) : 1,
-            customer_has_delivered: norm ? (phoneData[norm]?.hasDelivered || false) : false,
-            customer_has_returned: norm ? (phoneData[norm]?.hasReturned || false) : false,
-          };
         });
+        const phones = Array.from(phonesToQuery);
+
+        if (phones.length > 0) {
+          const allPhoneOrders = await fetch('/api/orders/phone-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phones })
+          }).then(async response => response.ok ? (await response.json()).data : null).catch(() => null);
         
-        setOrders(enrichedData as OrderWithItems[]);
-        ordersRef.current = enrichedData as OrderWithItems[];
+          const phoneData: Record<string, { count: number; hasDelivered: boolean; hasReturned: boolean }> = {};
+          if (allPhoneOrders) {
+            for (const row of allPhoneOrders as { phone?: string | null; call_status?: string | null }[]) {
+              if (row.phone) {
+                const norm = normalizePhone(row.phone);
+                if (!norm) continue;
+                if (!phoneData[norm]) {
+                  phoneData[norm] = { count: 0, hasDelivered: false, hasReturned: false };
+                }
+                phoneData[norm].count += 1;
+                const status = row.call_status;
+                if (status === 'delivered') phoneData[norm].hasDelivered = true;
+                if (status === 'returned') phoneData[norm].hasReturned = true;
+              }
+            }
+          }
+        
+          const enrichedData = data.map((order: Order) => {
+            const norm = normalizePhone(order.phone);
+            return {
+              ...order,
+              customer_order_count: norm ? (phoneData[norm]?.count || 1) : 1,
+              customer_has_delivered: norm ? (phoneData[norm]?.hasDelivered || false) : false,
+              customer_has_returned: norm ? (phoneData[norm]?.hasReturned || false) : false,
+            };
+          });
+        
+          setOrders(enrichedData as OrderWithItems[]);
+          ordersRef.current = enrichedData as OrderWithItems[];
+        } else {
+          setOrders(data as OrderWithItems[]);
+          ordersRef.current = data as OrderWithItems[];
+        }
       } else {
-        setOrders(data as OrderWithItems[]);
-        ordersRef.current = data as OrderWithItems[];
+        setOrders([]);
+        ordersRef.current = [];
       }
-    } else {
-      setOrders([]);
-      ordersRef.current = [];
+      if (typeof count === 'number') setTotalCount(count);
+      setSelected(new Set());
+    } catch {
+      setOrdersLoadFailed(true);
+    } finally {
+      setLoading(false);
     }
-    if (count !== null) setTotalCount(count);
-    setSelected(new Set());
-    setLoading(false);
   }, [viewArchived, page, pageSize, searchQuery, statusFilter]);
 
   // ── Sync active shipments (manual button + on-mount) ──────────────────────
   const syncDeliveryStatus = useCallback(async (silent = false) => {
     if (!silent) setSyncing(true);
+    let synced = false;
     try {
       const res = await fetch('/api/cosmos/sync', { method: 'POST' });
       const data = await res.json();
       if (res.ok && data.ok) {
-        await fetchOrders();
+        synced = true;
         setLastSync(new Date());
       } else {
         if (!silent) console.warn('[Sync]', data.error || 'Unknown error');
@@ -247,6 +251,7 @@ export default function AdminOrdersPage() {
     } catch (err: any) {
       if (!silent) showAdminError('Erreur: ' + err.message);
     }
+    if (!silent || synced) await fetchOrders();
     if (!silent) setSyncing(false);
   }, [fetchOrders]);
 
@@ -483,12 +488,18 @@ export default function AdminOrdersPage() {
                   </tr>
                 );
               })}
-              {orders.length === 0 && (
+              {orders.length === 0 && !ordersLoadFailed && (
                 <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">{viewArchived ? 'Aucune commande archivée.' : 'Aucune commande pour le moment.'}</td></tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {ordersLoadFailed && (
+          <p role="alert" className="px-4 py-6 text-center text-red-700">
+            Impossible de charger les commandes. Cliquez sur Actualiser pour réessayer.
+          </p>
+        )}
 
         {/* Mobile Stacked Cards (hidden on desktop) */}
         <div className="md:hidden divide-y divide-gray-100">
@@ -557,7 +568,7 @@ export default function AdminOrdersPage() {
               </div>
             );
           })}
-          {orders.length === 0 && (
+          {orders.length === 0 && !ordersLoadFailed && (
             <div className="p-8 text-center text-gray-500">{viewArchived ? 'Aucune commande archivée.' : 'Aucune commande pour le moment.'}</div>
           )}
         </div>

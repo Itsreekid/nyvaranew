@@ -1,6 +1,6 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-
-const GOOGLE_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=';
+import { NextRequest, NextResponse } from 'next/server';
+import { fetchProductImage, GeminiResponseError, readInlineImage, requestGeminiImage } from '@/lib/gemini-image';
+import { normalizeMorphology } from '@/lib/morphology';
 
 const buildSystemPrompt = () => {
   return `You are an expert stylist and senior e-commerce copywriter for Nyvara, a premium Tunisian brand. Analyze the provided image of a product and return STRICT valid JSON — no Markdown fences, no extra keys, no commentary outside the JSON object.
@@ -34,7 +34,7 @@ Required schema (return ALL fields, use null if not applicable to this product c
   ],
   "frame_shape": "Rond Classique",
   "style_vibe": "Retro",
-  "optical_fit": "Moyen / Standard",
+  "optical_fit": null,
   "ideal_faces": ["Rond", "Oval"]
 }
 
@@ -47,89 +47,33 @@ Rules:
 - rating_score: float between 4.2 and 4.9. rating_count: integer between 20 and 200.
 - highlights_bullets: exactly 4 lines IN FRENCH separated by newline.
 - full_description: 2 French marketing paragraphs.
-- technical_specs: EXACTLY 6 entries as { key, value } objects describing the item (e.g. materials, dimensions, features). All in French.
+- technical_specs: EXACTLY 6 entries as { key, value } objects describing the item's visible features in French. Never invent exact measurements or unverified materials.
 - style_vibe: MUST BE ONE OF: Retro | Minimaliste | Audacieux | Chic | Sport | Elegant
 - color_analysis.secondary_hex: null if the item is uniform in color.
 - frame_shape: IF THE PRODUCT IS EYEWEAR/GLASSES, MUST BE ONE OF: Rond Classique | Aviateur | Oeil-de-chat | Carree | Rectangulaire | Geometrique (otherwise null)
-- optical_fit: IF THE PRODUCT IS EYEWEAR/GLASSES, MUST BE ONE OF: Petit / Etroit | Moyen / Standard | Large (otherwise null)
+- optical_fit: IF THE PRODUCT IS EYEWEAR/GLASSES, use Petit / Etroit | Moyen / Standard | Large only when reliable scale or a visible size marking supports it. Otherwise return null. Never infer physical frame width from a photo without scale.
 - ideal_faces: IF THE PRODUCT IS EYEWEAR/GLASSES, array from: Rond | Oval | Carre | Coeur (otherwise null)
 - Output ONLY the JSON object. No prefix, no suffix, no markdown.`;
 };
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ success: false, error: 'Google API key is missing' }, { status: 500 });
-  }
+  if (!apiKey) return NextResponse.json({ success: false, error: 'Google API key is missing' }, { status: 500 });
 
-  let imageBase64: string | undefined;
-  let imageUrl: string | undefined;
-
-  try {
-    const body = await req.json();
-    imageBase64 = body?.imageBase64;
-    imageUrl = body?.imageUrl;
-  } catch (err: unknown) {
-    console.error('[analyze-glasses] JSON parse error:', err);
-    return NextResponse.json({ success: false, error: 'Invalid JSON body.' }, { status: 400 });
-  }
-
-  if (!imageBase64 && !imageUrl) {
+  let body;
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ success: false, error: 'Invalid JSON body.' }, { status: 400 }); }
+  if (typeof body?.imageBase64 !== 'string' && typeof body?.imageUrl !== 'string') {
     return NextResponse.json({ success: false, error: 'No imageBase64 or imageUrl provided.' }, { status: 400 });
   }
-
   try {
-    if (imageUrl && !imageBase64) {
-      const imgRes = await fetch(imageUrl);
-      const arrayBuffer = await imgRes.arrayBuffer();
-      imageBase64 = Buffer.from(arrayBuffer).toString('base64');
-    }
-
-    const rawBase64 = imageBase64!.replace(/^data:image\/\w+;base64,/, '');
-    const systemPrompt = buildSystemPrompt();
-
-    const res = await fetch(GOOGLE_API_URL + apiKey, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        generationConfig: {
-          responseMimeType: 'application/json'
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: systemPrompt },
-              {
-                inlineData: {
-                  mimeType: 'image/jpeg',
-                  data: rawBase64
-                }
-              }
-            ]
-          }
-        ]
-      })
+    const image = typeof body.imageBase64 === 'string' ? readInlineImage(body.imageBase64) : await fetchProductImage(body.imageUrl);
+    const data = await requestGeminiImage(image, buildSystemPrompt(), apiKey);
+    return NextResponse.json({ success: true, data: { ...data, ...normalizeMorphology(data) } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Analysis failed';
+    return NextResponse.json({ success: false, error: message }, {
+      status: error instanceof GeminiResponseError && error.status === 429 ? 429 : 502,
     });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('[analyze-glasses] Google API Error:', res.status, errText);
-      return NextResponse.json({ success: false, error: `Google API Error ${res.status}: ${errText}` }, { status: 500 });
-    }
-
-    const data = await res.json();
-    let content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    const parsed = JSON.parse(content);
-    return NextResponse.json({ success: true, data: parsed });
-
-  } catch (error: any) {
-    console.error('[analyze-glasses] Exception:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

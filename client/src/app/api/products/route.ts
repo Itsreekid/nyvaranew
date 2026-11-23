@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { headers } from "next/headers";
+import { MORPHOLOGY_NOT_SPECIFIED, normalizeFrameShape, normalizeMorphology } from '@/lib/morphology';
+import { parseMorphologyQuiz, rankMorphologyProducts } from '@/lib/morphology-quiz';
+import type { Product } from '@/types';
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -15,7 +18,8 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const category_id = searchParams.get("category_id");
-    const gender = searchParams.get("gender");
+    const quiz = parseMorphologyQuiz(searchParams.get("quiz"));
+    const gender = searchParams.get("gender") ?? quiz?.gender;
     const search = searchParams.get("search");
     const sort = searchParams.get("sort") || "newest";
     const page = parseInt(searchParams.get("page") || "0");
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
       params.push(category_id);
     }
     if (gender && gender !== "all") {
-      conditions.push(`p.gender = $${paramIdx++}`);
+      conditions.push(quiz ? `(p.gender = $${paramIdx++} OR p.gender = 'unisex')` : `p.gender = $${paramIdx++}`);
       params.push(gender);
     }
     if (search) {
@@ -51,11 +55,13 @@ export async function GET(request: NextRequest) {
       params.push(max_price);
     }
     const frame_shape = searchParams.get("frame_shape");
-    if (frame_shape) {
+    const normalizedShape = normalizeFrameShape(frame_shape);
+    if (frame_shape && !normalizedShape && !quiz) {
       conditions.push(`p.frame_shape = $${paramIdx++}`);
       params.push(frame_shape);
     }
 
+    const filterInMemory = Boolean(quiz || normalizedShape);
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // Determine ORDER BY
@@ -65,7 +71,7 @@ export async function GET(request: NextRequest) {
     else if (sort === "price_desc" || sort === "price-desc") orderBy = "p.price DESC";
     else if (sort === "tendance") orderBy = "p.review_count DESC NULLS LAST, p.rating DESC NULLS LAST";
 
-    if (searchParams.get("outOfStockLast") === "true") {
+    if (!quiz && searchParams.get("outOfStockLast") === "true") {
       // Match the whole-product availability shown on shop cards.
       orderBy = `(p.is_active IS FALSE
         OR (COALESCE(p.stock, 0) <= 0 AND p.allow_unlimited_stock IS NOT TRUE)
@@ -82,13 +88,13 @@ export async function GET(request: NextRequest) {
             ) AS stored
             CROSS JOIN LATERAL jsonb_array_elements(stored.variants) AS colors(color)
             WHERE jsonb_typeof(color->'id') = 'string' AND color->>'id' <> '')
-        ) ASC, ${orderBy}, p.id ASC`;
+        ) ASC, ${orderBy}`;
     }
 
     const noLimit = searchParams.get("noLimit") === "true";
 
     // Count query
-    const countRows = await sql.unsafe(
+    const countRows = filterInMemory ? [] : await sql.unsafe(
       `SELECT COUNT(*) as total FROM products p ${whereClause}`,
       params
     );
@@ -98,23 +104,28 @@ export async function GET(request: NextRequest) {
     let limitClause = "";
     let dataParams = [...params];
 
-    if (!noLimit) {
+    if (!noLimit && !filterInMemory) {
       limitClause = `LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
       dataParams.push(pageSize, offset);
     }
 
-    const rows = await sql.unsafe(
+    const rows = await sql.unsafe<Product[]>(
       `SELECT
         p.*,
         json_build_object('id', c.id, 'name', c.name) AS categories
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        ${whereClause}
-       ORDER BY ${orderBy}
+       ORDER BY ${orderBy}, p.id ASC
        ${limitClause}`,
       dataParams
     );
 
+    if (filterInMemory) {
+      const filtered = normalizedShape ? rows.filter(row => normalizeFrameShape(row.frame_shape) === normalizedShape) : rows;
+      const ranked = quiz ? rankMorphologyProducts(filtered, quiz) : filtered;
+      return NextResponse.json({ data: noLimit ? ranked : ranked.slice(offset, offset + pageSize), count: ranked.length });
+    }
     return NextResponse.json({ data: rows, count: total });
   } catch (err: any) {
     console.error("[API /products] Error:", err.message);
@@ -137,6 +148,8 @@ export async function POST(request: NextRequest) {
       frame_shape, style_vibe, optical_fit, ideal_faces
     } = body;
 
+    const morphology = normalizeMorphology({ frame_shape, style_vibe, optical_fit, ideal_faces });
+
     // Generate vector embedding
     const embedding = await generateProductEmbedding(body);
     const embeddingStr = embedding ? JSON.stringify(embedding) : null;
@@ -157,8 +170,10 @@ export async function POST(request: NextRequest) {
          ${color_options ? JSON.stringify(color_options) : null},
          ${quantity_breaks ? JSON.stringify(quantity_breaks) : null},
          ${is_active ?? true}, ${allow_unlimited_stock ?? false},
-         ${frame_shape ?? null}, ${style_vibe ?? null}, ${optical_fit ?? null},
-         ${ideal_faces && Array.isArray(ideal_faces) ? sql.array(ideal_faces) : null},
+         ${frame_shape === MORPHOLOGY_NOT_SPECIFIED ? frame_shape : morphology.frame_shape},
+         ${style_vibe === MORPHOLOGY_NOT_SPECIFIED ? style_vibe : morphology.style_vibe},
+         ${optical_fit === MORPHOLOGY_NOT_SPECIFIED ? optical_fit : morphology.optical_fit},
+         ${morphology.ideal_faces.length || Array.isArray(ideal_faces) ? sql.array(morphology.ideal_faces, 25) : null},
          ${embeddingStr})
       RETURNING *
     `;

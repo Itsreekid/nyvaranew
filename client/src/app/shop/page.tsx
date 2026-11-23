@@ -62,7 +62,7 @@ function ShopContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, urlCategorySlug]);
 
-  const { products, loading, error, totalCount } = useProducts(filters, sort, true);
+  const { products, loading, error, totalCount } = useProducts(filters, sort, true, searchParams.get('quiz') ?? undefined);
 
   const updateFilters = (newFilters: ProductFilters & { page?: number; pageSize?: number }) => {
     setFilters(newFilters);

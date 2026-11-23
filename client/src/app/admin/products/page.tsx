@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import Image from 'next/image';
 import { uploadImageToR2 } from '@/lib/r2-upload';
+import { FACE_LABELS, FIT_LABELS, FRAME_LABELS, MORPHOLOGY_NOT_SPECIFIED, STYLE_LABELS, normalizeMorphology } from '@/lib/morphology';
 import type { Product, Category, ColorOption, QuantityBreak } from '@/types';
 import Button from '@/components/ui/Button';
 import Toggle from '@/components/ui/Toggle';
@@ -114,6 +115,8 @@ export default function AdminProductsPage() {
   const [modalOpen, setModalOpen]         = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData]           = useState<FormState>(emptyForm);
+  const analysisVersion = useRef(0);
+  const manualMorphology = useRef(new Set<keyof FormState>());
   const [specRows, setSpecRows]           = useState<SpecRow[]>([]);
 
   // Gallery
@@ -145,6 +148,8 @@ export default function AdminProductsPage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const openAddModal = () => {
+    analysisVersion.current++;
+    manualMorphology.current.clear();
     setEditingProduct(null);
     setFormData(emptyForm);
     setGalleryImages([]);
@@ -161,6 +166,18 @@ export default function AdminProductsPage() {
   };
 
   const openEditModal = async (p: Product) => {
+    analysisVersion.current++;
+    manualMorphology.current.clear();
+    setIsAnalyzing(false);
+    setMainAiProgress(null);
+    setAiSuggestions([]);
+    setAiFilledFields(new Set());
+    setAiError(null);
+    const morphology = normalizeMorphology(p);
+    for (const field of ['frame_shape', 'style_vibe', 'optical_fit'] as const) {
+      if (p[field] === MORPHOLOGY_NOT_SPECIFIED) manualMorphology.current.add(field);
+    }
+    if (Array.isArray(p.ideal_faces) && !p.ideal_faces.length) manualMorphology.current.add('ideal_faces');
     setEditingProduct(p);
     setFormData({
       title:        p.title        ?? '',
@@ -181,10 +198,10 @@ export default function AdminProductsPage() {
       review_count: p.review_count != null ? String(p.review_count): '',
       is_active:    p.is_active ?? true,
       allow_unlimited_stock: p.allow_unlimited_stock ?? false,
-      frame_shape:  (p as any).frame_shape  ?? '',
-      style_vibe:   (p as any).style_vibe   ?? '',
-      optical_fit:  (p as any).optical_fit  ?? '',
-      ideal_faces:  parseJsonArray<string>((p as any).ideal_faces),
+      frame_shape:  morphology.frame_shape ?? '',
+      style_vibe:   morphology.style_vibe ?? '',
+      optical_fit:  morphology.optical_fit ?? '',
+      ideal_faces:  morphology.ideal_faces,
     });
     // Specs rows
     const specs = parseJsonObject(p.specs);
@@ -237,10 +254,10 @@ export default function AdminProductsPage() {
       quantity_breaks: quantityBreaks.length > 0 ? quantityBreaks : null,
       is_active:    formData.is_active,
       allow_unlimited_stock: formData.allow_unlimited_stock,
-      frame_shape:  formData.frame_shape  || null,
-      style_vibe:   formData.style_vibe   || null,
-      optical_fit:  formData.optical_fit  || null,
-      ideal_faces:  formData.ideal_faces && formData.ideal_faces.length > 0 ? formData.ideal_faces : null,
+      frame_shape:  formData.frame_shape || (manualMorphology.current.has('frame_shape') ? MORPHOLOGY_NOT_SPECIFIED : undefined),
+      style_vibe:   formData.style_vibe || (manualMorphology.current.has('style_vibe') ? MORPHOLOGY_NOT_SPECIFIED : undefined),
+      optical_fit:  formData.optical_fit || (manualMorphology.current.has('optical_fit') ? MORPHOLOGY_NOT_SPECIFIED : undefined),
+      ideal_faces:  formData.ideal_faces.length || manualMorphology.current.has('ideal_faces') ? formData.ideal_faces : undefined,
     };
 
     const res = editingProduct
@@ -332,12 +349,16 @@ export default function AdminProductsPage() {
   };
 
   const set = (field: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      manualMorphology.current.add(field);
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    };
 
 
   // AI Frame Analysis
   const handleAIFrameAnalysis = (file: File) => {
+    const version = ++analysisVersion.current;
+    const isCurrent = () => version === analysisVersion.current;
     setIsAnalyzing(true);
     setMainAiProgress(0);
     setAiSuggestions([]);
@@ -345,28 +366,34 @@ export default function AdminProductsPage() {
     setAiError(null);
 
     const progressInterval = setInterval(() => {
-      setMainAiProgress(p => p !== null && p < 99 ? p + 3 : p);
+      if (isCurrent()) setMainAiProgress(p => p !== null && p < 99 ? p + 3 : p);
     }, 500);
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const rawBase64 = ev.target?.result as string;
-      if (!rawBase64) {
-        clearInterval(progressInterval);
+    const reportUnreadable = () => {
+      clearInterval(progressInterval);
+      if (isCurrent()) {
+        setAiError('Impossible de lire cette image.');
         setIsAnalyzing(false);
         setMainAiProgress(null);
-        return;
       }
+    };
+    const reader = new FileReader();
+    reader.onerror = reportUnreadable;
+    reader.onload = (ev) => {
+      const rawBase64 = ev.target?.result as string;
+      if (!rawBase64) { reportUnreadable(); return; }
 
       const img = new window.Image();
+      img.onerror = reportUnreadable;
       img.onload = async () => {
+        if (!isCurrent()) { clearInterval(progressInterval); return; }
         const canvas = document.createElement('canvas');
         const MAX_WIDTH = 800;
         let width = img.width, height = img.height;
         if (width > MAX_WIDTH) { height = Math.round((height * MAX_WIDTH) / width); width = MAX_WIDTH; }
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) { setIsAnalyzing(false); return; }
+        if (!ctx) { reportUnreadable(); return; }
         ctx.drawImage(img, 0, 0, width, height);
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
 
@@ -378,6 +405,7 @@ export default function AdminProductsPage() {
             body: JSON.stringify({ imageBase64: compressedBase64, categoryName: catName }),
           });
           const json = await res.json();
+          if (!isCurrent()) return;
           if (!json.success || !json.data) {
             setAiError(json.error || 'Analyse IA echouee. Reessayez.');
             clearInterval(progressInterval);
@@ -387,6 +415,7 @@ export default function AdminProductsPage() {
           }
 
           const d = json.data;
+          const morphology = normalizeMorphology(d);
           const filled = new Set<string>();
 
           setFormData(prev => {
@@ -399,10 +428,17 @@ export default function AdminProductsPage() {
             if (d.rating_count != null) { next.review_count = String(d.rating_count); filled.add('review_count'); }
             if (d.highlights_bullets) { next.features = d.highlights_bullets; filled.add('features'); }
             if (d.full_description) { next.description = d.full_description; filled.add('description'); }
-            if (d.frame_shape) { next.frame_shape = d.frame_shape; filled.add('frame_shape'); }
-            if (d.style_vibe) { next.style_vibe = d.style_vibe; filled.add('style_vibe'); }
-            if (d.optical_fit) { next.optical_fit = d.optical_fit; filled.add('optical_fit'); }
-            if (Array.isArray(d.ideal_faces)) { next.ideal_faces = d.ideal_faces; filled.add('ideal_faces'); }
+            for (const field of ['frame_shape', 'style_vibe', 'optical_fit'] as const) {
+              const value = morphology[field];
+              if (value && !prev[field] && !manualMorphology.current.has(field)) {
+                next[field] = value;
+                filled.add(field);
+              }
+            }
+            if (morphology.ideal_faces.length && !prev.ideal_faces.length && !manualMorphology.current.has('ideal_faces')) {
+              next.ideal_faces = morphology.ideal_faces;
+              filled.add('ideal_faces');
+            }
             return next;
           });
 
@@ -427,12 +463,14 @@ export default function AdminProductsPage() {
 
           setAiFilledFields(filled);
         } catch (err) {
-          setAiError('Erreur reseau lors de l\'analyse IA.');
+          if (isCurrent()) setAiError('Erreur reseau lors de l\'analyse IA.');
           console.warn('[AI Frame Analysis] Silent fail:', err);
         } finally {
           clearInterval(progressInterval);
-          setMainAiProgress(100);
-          setTimeout(() => { setIsAnalyzing(false); setMainAiProgress(null); }, 800);
+          if (isCurrent()) {
+            setMainAiProgress(100);
+            setTimeout(() => { if (isCurrent()) { setIsAnalyzing(false); setMainAiProgress(null); } }, 800);
+          }
         }
       };
       img.src = rawBase64;
@@ -762,7 +800,7 @@ export default function AdminProductsPage() {
       {/* Add / Edit Modal */}
       <Modal
         isOpen={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingProduct(null); }}
+        onClose={() => { analysisVersion.current++; setModalOpen(false); setEditingProduct(null); }}
         title={editingProduct ? `Éditer — ${editingProduct.title}` : 'Ajouter un produit'}
       >
         <form onSubmit={handleSubmit} className={styles.form}>
@@ -894,51 +932,41 @@ export default function AdminProductsPage() {
                 <label>Forme de monture <AiBadge field="frame_shape" /></label>
                 <select className={styles.input} value={formData.frame_shape} onChange={set('frame_shape')}>
                   <option value="">— Selectionner —</option>
-                  <option value="Rond Classique">Rond Classique</option>
-                  <option value="Aviateur">Aviateur</option>
-                  <option value="Oeil-de-chat">Oeil-de-chat</option>
-                  <option value="Carree">Carree</option>
-                  <option value="Rectangulaire">Rectangulaire</option>
-                  <option value="Geometrique">Geometrique</option>
+                  {Object.entries(FRAME_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                 </select>
               </div>
               <div className={styles.inputGroup}>
                 <label>Style / Vibe <AiBadge field="style_vibe" /></label>
                 <select className={styles.input} value={formData.style_vibe} onChange={set('style_vibe')}>
                   <option value="">— Selectionner —</option>
-                  <option value="Retro">Retro</option>
-                  <option value="Minimaliste">Minimaliste</option>
-                  <option value="Audacieux">Audacieux</option>
-                  <option value="Chic">Chic</option>
-                  <option value="Sport">Sport</option>
+                  {Object.entries(STYLE_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                 </select>
               </div>
               <div className={styles.inputGroup}>
                 <label>Taille / Coupe <AiBadge field="optical_fit" /></label>
                 <select className={styles.input} value={formData.optical_fit} onChange={set('optical_fit')}>
                   <option value="">— Selectionner —</option>
-                  <option value="Petit / Etroit">Petit / Etroit</option>
-                  <option value="Moyen / Standard">Moyen / Standard</option>
-                  <option value="Large">Large</option>
+                  {Object.entries(FIT_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                 </select>
               </div>
             </div>
             <div className={styles.inputGroup} style={{ marginTop: '12px' }}>
               <label>Visages recommandes <AiBadge field="ideal_faces" /></label>
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {['Rond', 'Oval', 'Carre', 'Coeur'].map(face => {
-                  const isChecked = formData.ideal_faces.some(f => f.toLowerCase() === face.toLowerCase() || (face === 'Oval' && f.toLowerCase() === 'ovale') || (face === 'Coeur' && f.toLowerCase() === 'coeur'));
+                {Object.entries(FACE_LABELS).map(([face, label]) => {
+                  const isChecked = formData.ideal_faces.includes(face);
                   return (
                     <label key={face} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', cursor: 'pointer' }}>
                       <input type="checkbox" checked={isChecked} onChange={(e) => {
                         const checked = e.target.checked;
+                        manualMorphology.current.add('ideal_faces');
                         setFormData(prev => {
-                          let newFaces = prev.ideal_faces.filter(f => f.toLowerCase() !== face.toLowerCase() && !(face === 'Oval' && f.toLowerCase() === 'ovale') && !(face === 'Coeur' && f.toLowerCase() === 'coeur'));
+                          const newFaces = prev.ideal_faces.filter(f => f !== face);
                           if (checked) newFaces.push(face);
                           return { ...prev, ideal_faces: newFaces };
                         });
                       }} style={{ accentColor: '#7c5cfc', width: '16px', height: '16px' }} />
-                      {face}
+                      {label}
                     </label>
                   );
                 })}

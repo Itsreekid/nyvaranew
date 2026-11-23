@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
               json_build_object(
                 'id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity,
                 'quantity_break_price', oi.quantity_break_price,
-                'selected_color_id', oi.selected_color_id,
+                'selected_color_id', to_jsonb(oi)->>'selected_color_id',
                 'selected_color_name', oi.selected_color_name,
                 'selected_color_hex1', oi.selected_color_hex1,
                 'selected_color_hex2', oi.selected_color_hex2,
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
               json_build_object(
                 'id', oi.id, 'product_id', oi.product_id, 'quantity', oi.quantity,
                 'quantity_break_price', oi.quantity_break_price,
-                'selected_color_id', oi.selected_color_id,
+                'selected_color_id', to_jsonb(oi)->>'selected_color_id',
                 'selected_color_name', oi.selected_color_name,
                 'selected_color_hex1', oi.selected_color_hex1,
                 'selected_color_hex2', oi.selected_color_hex2,

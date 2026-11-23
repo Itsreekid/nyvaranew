@@ -96,15 +96,13 @@ type FrameSizeId = typeof FRAME_SIZES[number]['id'];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function getRecommendation(faceId: FaceShapeId, _styleId: StyleVibeId, sizeId: FrameSizeId) {
+function getRecommendation(faceId: FaceShapeId, sizeId: FrameSizeId) {
   const face = FACE_SHAPES.find(f => f.id === faceId)!;
   const size = FRAME_SIZES.find(s => s.id === sizeId)!;
   return {
     frames: face.frames,
     sizeLabel: size.sizeKey,
     why: face.why,
-    shapeParam: face.frames.fr[0], // Use first French frame as the URL param match for simplicity
-    sizeParam: sizeId,
   };
 }
 
@@ -115,7 +113,7 @@ const UI_TEXT = {
   of: { fr: 'sur', ar: 'من' },
   resultTitle: { fr: '✨ Votre Recommandation', ar: '✨ نظارتك المثالية' },
   badge: { fr: 'Montures Recommandées', ar: 'الإطارات المنصوح بيها' },
-  sizeLabel: { fr: 'Taille :', ar: 'الحجم:' },
+  sizeLabel: { fr: 'Taille souhaitée :', ar: 'الحجم المطلوب:' },
   browse: { fr: 'Voir les montures', ar: 'شوف النظارات اللي تناسبك' },
   retake: { fr: 'Recommencer', ar: 'عاود الكويز' },
   back: { fr: 'Retour', ar: 'رجوع' },
@@ -135,10 +133,10 @@ const UI_TEXT = {
   step4Sub: { fr: 'Cela nous aide à affiner notre sélection.', ar: 'هذا يعاونا باش نختارو الإطارات اللي تواتيك أكثر.' },
   
   step5Title: { fr: 'Quelle est votre taille de monture ?', ar: 'شنوا حجم النظارة المفضل عندك؟' },
-  step5Sub: { fr: 'Vérifiez les chiffres à l\'intérieur de vos lunettes.', ar: 'ثبت في الأرقام المكتوبة داخل نظارتك القديمة.' },
+  step5Sub: { fr: 'Comparez avec la largeur totale d’une monture qui vous va bien.', ar: 'قارن مع العرض الكلّي متاع إطار يواتيك.' },
   step5Tip: { 
-    fr: '💡 Astuce : Vérifiez les 3 chiffres (ex: 52-18-140). Le premier est la largeur du verre.',
-    ar: '💡 ملاحظة: ثبت في الأرقام المكتوبة داخل نظارتك — مثال 52-18-140. الرقم اللول هو عرض العدسة.'
+    fr: '💡 Mesurez la largeur totale, d’un bord extérieur à l’autre.',
+    ar: '💡 قيس العرض الكلّي من طرف الإطار للطرف الآخر.'
   },
 };
 
@@ -227,7 +225,7 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
   };
 
   const rec = faceShape && styleVibe && frameSize
-    ? getRecommendation(faceShape, styleVibe, frameSize)
+    ? getRecommendation(faceShape, frameSize)
     : null;
 
   return (
@@ -265,7 +263,7 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
 
             <div className={styles.resultsCtas}>
               <Link
-                href={`/shop?gender=${gender}&frame_shape=${encodeURIComponent(rec.shapeParam)}`}
+                href={`/shop?quiz=${encodeURIComponent([gender, faceShape, styleVibe, frameSize].join(','))}`}
                 className={styles.primaryCta}
                 onClick={onClose}
               >
