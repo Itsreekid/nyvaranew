@@ -268,6 +268,9 @@
   color: white;
 }
 .productSearch { max-width: 520px; }
+.productBrowse { margin-top: 8px; color: #c5b9d0; font-size: 12px; }
+.productBrowse summary { width: fit-content; padding-block: 6px; cursor: pointer; }
+.productBrowse .selectInput { display: block; max-width: 100%; margin-top: 4px; }
 .productSearchField {
   display: flex;
   align-items: center;

@@ -677,6 +677,25 @@ export default function OrderDetailsDrawer({
                               {matchingProducts.length > 6 && <p className={styles.productSearchHint} role="status">6 sur {matchingProducts.length} produits. Affinez la recherche.</p>}
                             </>
                         )}
+                        {products && products.length > 0 && (
+                          <details className={styles.productBrowse}>
+                            <summary>Parcourir tous les produits</summary>
+                            <select
+                              className={styles.selectInput}
+                              aria-label="Choisir un produit dans le catalogue"
+                              value=""
+                              onChange={event => {
+                                const product = products.find(item => item.id === event.target.value);
+                                if (product) addProduct(product);
+                              }}
+                            >
+                              <option value="" disabled>Choisir un produit…</option>
+                              {products.map(product => (
+                                <option key={product.id} value={product.id}>{product.title}</option>
+                              ))}
+                            </select>
+                          </details>
+                        )}
                       </div>
                     </td>
                   </tr>
