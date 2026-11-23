@@ -9,6 +9,9 @@
 .icon { width: 45px; height: 45px; display: grid; place-items: center; background: #f3e9dc; color: #6b4f2d; border-radius: 50%; }
 @media (max-width: 550px) {
   .grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+  .grid:has(> li:nth-child(4):last-child, > li:nth-child(6):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .grid a { min-height: 89px; padding-inline: 5px; }
   .icon { width: 37px; height: 37px; }
   .icon svg { width: 22px; height: 22px; }
