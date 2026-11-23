@@ -13,7 +13,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const rename = name === undefined ? sql`` : sql`name = ${name.trim()},`;
     const rows = homepage_config !== undefined
       ? await sql`UPDATE categories SET ${rename}
-          homepage_config = ${sql.json(readCategoryConfig(homepage_config))} WHERE id = ${id}::uuid RETURNING id`
+          homepage_config = COALESCE(homepage_config, '{}'::jsonb)
+            || (${sql.json(readCategoryConfig(homepage_config))}::jsonb - 'order')
+          WHERE id = ${id}::uuid RETURNING id`
       : await sql`UPDATE categories SET name = ${name.trim()} WHERE id = ${id}::uuid RETURNING id`;
     if (!rows.length) return NextResponse.json({ error: 'Catégorie introuvable.' }, { status: 404 });
     return NextResponse.json({ success: true });

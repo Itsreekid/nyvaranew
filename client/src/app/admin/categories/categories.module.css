@@ -141,3 +141,22 @@
 .iconGrid button { display: grid; place-items: center; gap: 4px; min-height: 50px; padding: 6px; font-size: .8125rem; border: 1px solid #ddd5c8; border-radius: 6px; }
 .iconGrid button[aria-pressed='true'] { background: #f5e8d1; border-color: #956b37; color: #382414; }
 .categoryIdentity { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.categoryIdentity svg { flex-shrink: 0; }
+.reorderHint { margin: 0 0 12px; font-size: .8125rem; color: #62584b; }
+.dragHandle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #62584b;
+  cursor: grab;
+  touch-action: none;
+}
+.dragHandle:active { cursor: grabbing; }
+.dragHandle:hover, .dragHandle:focus-visible { background: #ebe5da; }
+.dragHandle[aria-disabled='true'] { cursor: wait; }
+.dropTarget { border-color: #956b37; background: #f5e8d1; }

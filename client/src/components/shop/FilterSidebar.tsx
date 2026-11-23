@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
-import { useCategories } from '@/hooks/useOrders';
 import Button from '@/components/ui/Button';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslation } from '@/locales/dictionary';
-import type { ProductFilters, Gender } from '@/types';
+import type { ProductFilters, Gender, Category } from '@/types';
 import styles from './FilterSidebar.module.css';
 
 interface FilterSidebarProps {
+  categories: Category[];
+  loading: boolean;
   filters: ProductFilters;
   onChange: (filters: ProductFilters) => void;
   onReset: () => void;
@@ -24,8 +25,7 @@ const FRAME_SHAPES_MAP = [
   { val: 'Geometrique', key: 'shapes.geometric' },
 ];
 
-export default function FilterSidebar({ filters, onChange, onReset }: FilterSidebarProps) {
-  const { categories, loading } = useCategories();
+export default function FilterSidebar({ categories, loading, filters, onChange, onReset }: FilterSidebarProps) {
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
 

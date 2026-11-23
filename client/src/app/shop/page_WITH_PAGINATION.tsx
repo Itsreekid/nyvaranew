@@ -10,6 +10,7 @@ import { Suspense } from 'react';
 import FilterSidebar from '@/components/shop/FilterSidebar';
 import ProductSkeleton from '@/components/shop/ProductSkeleton';
 import SortBar from '@/components/shop/SortBar';
+import { useCategories } from '@/hooks/useOrders';
 import { useProducts } from '@/hooks/useProducts';
 import type { ProductFilters, SortOption } from '@/types';
 import styles from './shop.module.css';
@@ -25,6 +26,7 @@ const ProductGrid = dynamic(() => import('@/components/shop/ProductGrid'), {
 
 function ShopContent() {
   const searchParams = useSearchParams();
+  const { categories, loading: categoriesLoading } = useCategories();
   const initialGender = (searchParams.get('gender') as ProductFilters['gender']) ?? 'all';
   const initialSearch = searchParams.get('search') ?? undefined;
 
@@ -87,6 +89,8 @@ function ShopContent() {
         {/* Mobile filter row */}
         <div className={styles.mobileFilterRow}>
           <FilterSidebar
+            categories={categories}
+            loading={categoriesLoading}
             filters={filters}
             onChange={handleFilterChange}
             onReset={handleReset}
@@ -96,6 +100,8 @@ function ShopContent() {
         <div className={styles.body}>
           <aside className={styles.sidebar}>
             <FilterSidebar
+              categories={categories}
+              loading={categoriesLoading}
               filters={filters}
               onChange={handleFilterChange}
               onReset={handleReset}

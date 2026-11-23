@@ -30,7 +30,7 @@ function ShopContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { categories } = useCategories();
+  const { categories, loading: categoriesLoading, loaded: categoriesLoaded } = useCategories();
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
 
@@ -59,17 +59,16 @@ function ShopContent() {
   const [sort, setSort] = useState<SortOption>(initialSort);
 
   useEffect(() => {
-    if (directCategory) {
-      setFilters(previous => previous.category_id === directCategory ? previous : { ...previous, category_id: directCategory, page: 0 });
-    } else if (!urlCategorySlug) {
-      setFilters(previous => previous.category_id ? { ...previous, category_id: undefined, page: 0 } : previous);
-    } else if (categories.length > 0) {
-      const matched = categories.find(c => (c.name && toSlug(c.name) === urlCategorySlug) || c.id === urlCategorySlug);
-      if (matched) {
-        setFilters(f => f.category_id === matched.id ? f : { ...f, category_id: matched.id, page: 0 });
-      }
-    }
-  }, [categories, directCategory, urlCategorySlug]);
+    if (urlCategorySlug && !categoriesLoaded) return;
+    const categoryId = urlCategorySlug
+      ? categories.find(category => directCategory
+        ? category.id.toLowerCase() === directCategory.toLowerCase()
+        : category.name && toSlug(category.name) === urlCategorySlug)?.id
+      : undefined;
+    setFilters(previous => previous.category_id === categoryId
+      ? previous
+      : { ...previous, category_id: categoryId, page: 0 });
+  }, [categories, categoriesLoaded, directCategory, urlCategorySlug]);
 
   const { products, loading, error, totalCount } = useProducts(filters, sort, true);
 
@@ -136,6 +135,8 @@ function ShopContent() {
         {/* Mobile filter trigger rendered inside FilterSidebar */}
         <div className={styles.mobileFilterRow}>
           <FilterSidebar
+            categories={categories}
+            loading={categoriesLoading}
             filters={filters}
             onChange={(newFilters) => updateFilters({ ...newFilters, page: 0, pageSize: 20 })}
             onReset={handleReset}
@@ -146,6 +147,8 @@ function ShopContent() {
           {/* Desktop sidebar */}
           <aside className={styles.sidebar}>
             <FilterSidebar
+              categories={categories}
+              loading={categoriesLoading}
               filters={filters}
               onChange={(newFilters) => updateFilters({ ...newFilters, page: 0, pageSize: 20 })}
               onReset={handleReset}

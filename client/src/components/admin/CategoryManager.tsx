@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Search } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from 'react';
+import { GripVertical, Search } from 'lucide-react';
 import type { Category } from '@/types';
 import { categoryIcons, defaultCategoryConfig, readCategoryConfig, type CategoryHomepageConfig, type CategoryIconId } from '@/lib/category-icons';
 import { showAdminError } from '@/lib/admin-error';
@@ -54,10 +54,6 @@ function CategoryForm({ category, save, cancel, homepageOnly = false }: {
             <option value="false">Masquer sur l’accueil</option>
           </select>
         </label>
-        <label>Ordre d’affichage
-          <input className={styles.input} type="number" min={0} max={9999} value={config.order}
-            onChange={event => setConfig({ ...config, order: Number(event.target.value) })} />
-        </label>
       </div>
       <details className={styles.iconPicker}>
         <summary><SelectedIcon size={18} aria-hidden="true" /> Icône · {categoryIcons[config.icon].label}</summary>
@@ -86,6 +82,8 @@ export default function CategoryManager({ homepageOnly = false }: { homepageOnly
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string>();
+  const [savingOrder, setSavingOrder] = useState(false);
   const homepageSelect = useRef<HTMLSelectElement>(null);
 
   const fetchCategories = async () => {
@@ -93,7 +91,11 @@ export default function CategoryManager({ homepageOnly = false }: { homepageOnly
       const response = await fetch('/api/categories', { cache: 'no-store' });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error);
-      setCategories(Array.isArray(json.data) ? json.data : []);
+      const rows: Category[] = Array.isArray(json.data) ? json.data : [];
+      if (homepageOnly) {
+        rows.sort((a, b) => readCategoryConfig(a.homepage_config).order - readCategoryConfig(b.homepage_config).order);
+      }
+      setCategories(rows);
     } catch (error) {
       showAdminError(error instanceof Error ? error.message : 'Impossible de charger les catégories.');
     } finally { setLoading(false); }
@@ -116,6 +118,35 @@ export default function CategoryManager({ homepageOnly = false }: { homepageOnly
       showAdminError(error instanceof Error ? error.message : 'Impossible d’enregistrer la catégorie.');
       return false;
     }
+  }
+
+  async function moveCategory(from: number, to: number) {
+    if (savingOrder || to < 0 || to >= categories.length || from === to) return;
+
+    const next = [...categories];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setCategories(next);
+    setSavingOrder(true);
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: next.map(category => category.id) }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error);
+      showAdminSuccess('Ordre des catégories enregistré.');
+    } catch (error) {
+      setCategories(categories);
+      showAdminError(error instanceof Error ? error.message : 'Impossible d’enregistrer l’ordre.');
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  function categoryUnderPointer(event: PointerEvent<HTMLButtonElement>) {
+    return document.elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-home-category]')?.dataset.homeCategory;
   }
 
   async function removeCategory(category: Category) {
@@ -155,18 +186,53 @@ export default function CategoryManager({ homepageOnly = false }: { homepageOnly
       </div>
       <div className={styles.listCard}>
         <h2 className={styles.cardTitle}>{categories.length} catégorie{categories.length !== 1 ? 's' : ''}</h2>
-        <div className={styles.list}>
+        {homepageOnly && categories.length > 1 && (
+          <p className={styles.reorderHint} id="homepage-category-order">
+            Faites glisser les poignées ou utilisez les flèches ↑ et ↓. L’ordre est enregistré automatiquement.
+          </p>
+        )}
+        <div className={styles.list} aria-busy={homepageOnly && savingOrder}>
           {!categories.length && <p className={styles.empty}>Aucune catégorie pour le moment.</p>}
-          {categories.map(category => {
+          {categories.map((category, index) => {
             const config = readCategoryConfig(category.homepage_config);
             const Icon = categoryIcons[config.icon].icon;
             return (
-              <div key={category.id} className={styles.catRow}>
+              <div key={category.id} data-home-category={homepageOnly ? category.id : undefined}
+                className={dropTarget === category.id ? `${styles.catRow} ${styles.dropTarget}` : styles.catRow}>
                 {!homepageOnly && editId === category.id ? (
                   <CategoryForm category={category} save={(name, config) => saveCategory(name, config, category.id)} cancel={() => setEditId(null)} />
                 ) : (
                   <>
-                    <span className={styles.categoryIdentity}><Icon size={20} aria-hidden="true" /><span className={styles.catName}>{category.name}</span></span>
+                    <div className={styles.categoryIdentity}>
+                      {homepageOnly && categories.length > 1 && (
+                        <button type="button" className={styles.dragHandle} aria-label={`Déplacer ${category.name}`}
+                          aria-describedby="homepage-category-order" aria-disabled={savingOrder}
+                          onPointerDown={event => {
+                            if (savingOrder || !event.isPrimary || event.button !== 0) return;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                          }}
+                          onPointerMove={event => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                              const target = categoryUnderPointer(event);
+                              setDropTarget(target === category.id ? undefined : target);
+                            }
+                          }}
+                          onPointerUp={event => {
+                            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                            const target = categoryUnderPointer(event);
+                            void moveCategory(index, categories.findIndex(row => row.id === target));
+                          }}
+                          onLostPointerCapture={() => setDropTarget(undefined)}
+                          onKeyDown={event => {
+                            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                            event.preventDefault();
+                            void moveCategory(index, index + (event.key === 'ArrowUp' ? -1 : 1));
+                          }}>
+                          <GripVertical size={19} aria-hidden="true" />
+                        </button>
+                      )}
+                      <Icon size={20} aria-hidden="true" /><span className={styles.catName}>{category.name}</span>
+                    </div>
                     <div className={styles.catActions}>
                       <button type="button" className={styles.editBtn} onClick={() => { setEditId(category.id); homepageSelect.current?.focus(); }}>Modifier</button>
                       {!homepageOnly && <button type="button" className={styles.deleteBtn} onClick={() => void removeCategory(category)}>Supprimer</button>}

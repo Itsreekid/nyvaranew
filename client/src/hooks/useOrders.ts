@@ -6,31 +6,46 @@ import type { CreateOrderPayload, Category } from '@/types';
 // ?? useCategories ?????????????????????????????????????????????????????????
 export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const run = async () => {
-      console.log('[useCategories] 🔄 fetching /api/categories...');
+    const controller = new AbortController();
+    let pending = false;
+
+    async function refresh() {
+      if (pending) return;
+      pending = true;
       try {
-        const res = await fetch('/api/categories');
-        console.log('[useCategories] 📡 status:', res.status, res.statusText);
+        const res = await fetch('/api/categories', { cache: 'no-store', signal: controller.signal });
         const json = await res.json();
-        console.log('[useCategories] 📦 raw response:', json);
-        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-        const arr = Array.isArray(json.data) ? json.data : [];
-        console.log('[useCategories] ✅ count:', arr.length, arr);
-        setCategories(arr);
-      } catch (err: any) {
-        console.error('[useCategories] ❌ error:', err.message, err);
+        if (!res.ok || !Array.isArray(json.data)) throw new Error(json.error || 'Invalid category response');
+        if (controller.signal.aborted) return;
+        setCategories(json.data);
+        setLoaded(true);
+      } catch (error) {
+        if (!controller.signal.aborted) console.error('[useCategories]', error);
       } finally {
-        setLoading(false);
-        console.log('[useCategories] 🏁 done');
+        pending = false;
+        if (!controller.signal.aborted) setLoading(false);
       }
+    }
+
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) void refresh();
+    }
+
+    void refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      controller.abort();
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', onPageShow);
     };
-    run();
   }, []);
 
-  return { categories, loading };
+  return { categories, loading, loaded };
 }
 
 // ?? useCreateOrder ????????????????????????????????????????????????????????
