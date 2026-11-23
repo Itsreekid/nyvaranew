@@ -10,15 +10,17 @@ const getActualPrice = (p: Product) => {
 };
 
 // ?? useProducts ???????????????????????????????????????????????????????????
-export function useProducts(filters?: ProductFilters, sort?: SortOption, outOfStockLast = false, quiz?: string) {
+export function useProducts(filters?: ProductFilters & { page?: number; pageSize?: number }, sort?: SortOption, outOfStockLast = false, quiz?: string) {
   const [products, setProducts]     = useState<Product[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [alternatives, setAlternatives] = useState<Product[]>([]);
+  const [strongCount, setStrongCount] = useState(0);
 
   // Derive stable primitive values for the dependency array
-  const pageSize = (filters as any)?.pageSize ?? 20;
-  const page     = (filters as any)?.page     ?? 0;
+  const pageSize = filters?.pageSize ?? 20;
+  const page     = filters?.page     ?? 0;
 
   const fetchProducts = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError(null);
@@ -41,12 +43,19 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption, outOfSt
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load products');
 
+      if (quiz && (!Array.isArray(json.data) || !Array.isArray(json.alternatives)
+        || typeof json.quiz?.strongCount !== 'number')) {
+        throw new Error('Les recommandations sont indisponibles. Veuillez réessayer.');
+      }
+      if (signal?.aborted) return;
+      setAlternatives(json.alternatives ?? []);
+      setStrongCount(json.quiz?.strongCount ?? 0);
       setTotalCount(json.count ?? 0);
       setProducts(json.data ?? []);
     } catch (e: any) {
       if (e.name === 'AbortError') return;
       setError(e instanceof Error ? e.message : 'Failed to load products');
-    } finally { setLoading(false); }
+    } finally { if (!signal?.aborted) setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters?.category_id, filters?.gender, filters?.min_price, filters?.max_price, filters?.search, filters?.frame_shape, sort, page, pageSize, outOfStockLast, quiz]);
 
@@ -55,7 +64,7 @@ export function useProducts(filters?: ProductFilters, sort?: SortOption, outOfSt
     fetchProducts(controller.signal);
     return () => controller.abort();
   }, [fetchProducts]);
-  return { products, loading, error, totalCount, refetch: fetchProducts };
+  return { products, alternatives, strongCount, loading, error, totalCount, refetch: fetchProducts };
 }
 
 // ?? useProduct (single) ???????????????????????????????????????????????????

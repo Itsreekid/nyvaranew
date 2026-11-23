@@ -23,6 +23,33 @@ export function parseMorphologyQuiz(token: string | null) {
   return { gender, face, style, size } as const;
 }
 
+export type MorphologyQuiz = NonNullable<ReturnType<typeof parseMorphologyQuiz>>;
+
+export function getMorphologyRecommendations(products: Product[], quiz: MorphologyQuiz) {
+  const strong: Product[] = [];
+  const alternatives: Product[] = [];
+  for (const product of rankMorphologyProducts(products, quiz)) {
+    if ((product.gender !== quiz.gender && product.gender !== 'unisex')
+      || isProductOutOfStock(product, getProductColors(product.color_options))) continue;
+
+    const metadata = normalizeMorphology(product);
+    const faceMatch = metadata.ideal_faces.includes(quiz.face);
+    const faceFallback = metadata.ideal_faces.length === 0 && metadata.frame_shape
+      && faceFrames[quiz.face].includes(metadata.frame_shape);
+    const styleMatch = quiz.style !== 'all' && metadata.frame_shape
+      && styleFrames[quiz.style].includes(metadata.frame_shape);
+    const vibeFallback = quiz.style !== 'all' && !metadata.frame_shape && metadata.style_vibe
+      && styleVibes[quiz.style].includes(metadata.style_vibe);
+    const sizeMatch = metadata.optical_fit === quiz.size;
+    if (faceMatch && sizeMatch && (quiz.style === 'all' || styleMatch)) {
+      strong.push(product);
+    } else if (faceMatch || faceFallback || styleMatch || vibeFallback || sizeMatch) {
+      alternatives.push(product);
+    }
+  }
+  return { strong, alternatives };
+}
+
 export function rankMorphologyProducts(products: Product[], quiz: NonNullable<ReturnType<typeof parseMorphologyQuiz>>) {
   return products.filter(product => product.is_active !== false && isEyewear(product)).map(product => {
     const metadata = normalizeMorphology(product);

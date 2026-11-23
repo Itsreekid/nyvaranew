@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { headers } from "next/headers";
 import { MORPHOLOGY_NOT_SPECIFIED, normalizeFrameShape, normalizeMorphology } from '@/lib/morphology';
-import { parseMorphologyQuiz, rankMorphologyProducts } from '@/lib/morphology-quiz';
+import { getMorphologyRecommendations, parseMorphologyQuiz } from '@/lib/morphology-quiz';
 import type { Product } from '@/types';
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
     const searchParams = url.searchParams;
     const category_id = searchParams.get("category_id");
     const quiz = parseMorphologyQuiz(searchParams.get("quiz"));
-    const gender = searchParams.get("gender") ?? quiz?.gender;
+    if (searchParams.has("quiz") && (!quiz || searchParams.getAll("quiz").length !== 1)) {
+      return NextResponse.json({ error: "Réponses du quiz invalides. Recommencez le quiz." }, { status: 400 });
+    }
+    const gender = quiz?.gender ?? searchParams.get("gender");
     const search = searchParams.get("search");
     const sort = searchParams.get("sort") || "newest";
     const page = parseInt(searchParams.get("page") || "0");
@@ -123,8 +126,19 @@ export async function GET(request: NextRequest) {
 
     if (filterInMemory) {
       const filtered = normalizedShape ? rows.filter(row => normalizeFrameShape(row.frame_shape) === normalizedShape) : rows;
-      const ranked = quiz ? rankMorphologyProducts(filtered, quiz) : filtered;
-      return NextResponse.json({ data: noLimit ? ranked : ranked.slice(offset, offset + pageSize), count: ranked.length });
+      if (quiz) {
+        const { strong, alternatives } = getMorphologyRecommendations(filtered, quiz);
+        const end = offset + pageSize;
+        return NextResponse.json({
+          data: noLimit ? strong : strong.slice(offset, end),
+          alternatives: noLimit ? alternatives : alternatives.slice(
+            Math.max(0, offset - strong.length), Math.max(0, end - strong.length),
+          ),
+          count: strong.length + alternatives.length,
+          quiz: { strongCount: strong.length, alternativeCount: alternatives.length },
+        });
+      }
+      return NextResponse.json({ data: noLimit ? filtered : filtered.slice(offset, offset + pageSize), count: filtered.length });
     }
     return NextResponse.json({ data: rows, count: total });
   } catch (err: any) {

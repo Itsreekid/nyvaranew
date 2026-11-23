@@ -166,7 +166,7 @@ export default function OrderDetailsDrawer({
 
   const handleSave = async () => {
     if (!order) return;
-    if (editableItems.length === 0) {
+    if (editableItems.length === 0 && (mode === 'create' || viewItems.length > 0)) {
       showAdminError('Une commande doit contenir au moins un produit.');
       return;
     }
@@ -195,8 +195,9 @@ export default function OrderDetailsDrawer({
           if (!insertRes.ok) { const j = await insertRes.json(); throw new Error(j.error); }
         }
       } else {
-        const originalIds = viewItems.map(i => i.id);
-        const deletedIds  = originalIds.filter(id => !editableItems.find(i => i.id === id));
+        const originals = new Map(viewItems.map(item => [item.id, item]));
+        const deletedIds = viewItems.filter(item => !editableItems.some(edit => edit.id === item.id)).map(item => item.id);
+        let totalsChanged = deletedIds.length > 0;
         if (deletedIds.length > 0) {
           const delRes = await fetch('/api/order-items', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: deletedIds }) });
           if (!delRes.ok) { const j = await delRes.json(); throw new Error(j.error); }
@@ -204,15 +205,25 @@ export default function OrderDetailsDrawer({
 
         for (const item of editableItems) {
           if (item.id.startsWith('temp_')) {
+            totalsChanged = true;
             const insRes = await fetch('/api/order-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: order.id, product_id: item.product_id || (item.products as any)?.id, quantity: item.quantity, quantity_break_price: item.custom_price, selected_color_name: item.selected_color_name ?? null, selected_color_hex1: item.selected_color_hex1 ?? null, selected_color_hex2: item.selected_color_hex2 ?? null }) });
             if (!insRes.ok) { const j = await insRes.json(); throw new Error(j.error); }
           } else {
+            const original = originals.get(item.id);
+            const priceOrQuantityChanged = !original || item.quantity !== original.quantity
+              || item.custom_price !== getUnitPrice(original);
+            const colorChanged = !original
+              || (item.selected_color_name ?? null) !== (original.selected_color_name ?? null)
+              || (item.selected_color_hex1 ?? null) !== (original.selected_color_hex1 ?? null)
+              || (item.selected_color_hex2 ?? null) !== (original.selected_color_hex2 ?? null);
+            if (!priceOrQuantityChanged && !colorChanged) continue;
+            totalsChanged ||= priceOrQuantityChanged;
             const updRes = await fetch('/api/order-items', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id, quantity: item.quantity, quantity_break_price: item.custom_price, selected_color_name: item.selected_color_name ?? null, selected_color_hex1: item.selected_color_hex1 ?? null, selected_color_hex2: item.selected_color_hex2 ?? null }) });
             if (!updRes.ok) { const j = await updRes.json(); throw new Error(j.error); }
           }
         }
 
-        const updateRes = await fetch('/api/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: order.id, ...formData, total_price: newTotal }) });
+        const updateRes = await fetch('/api/orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: order.id, ...formData, ...(totalsChanged ? { total_price: newTotal } : {}) }) });
         if (!updateRes.ok) { const j = await updateRes.json(); throw new Error(j.error); }
       }
 

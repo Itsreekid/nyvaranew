@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { parseMorphologyQuiz } from '@/lib/morphology-quiz';
 import { X, ChevronRight, ChevronLeft, RotateCcw, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { useLanguage, type Lang } from '@/context/LanguageContext';
 import styles from './FindYourFit.module.css';
 
 // ─── Multilingual Data ────────────────────────────────────────────────────────
 
-const FACE_SHAPES = [
+export const FACE_SHAPES = [
   {
     id: 'round',
     emoji: '⚪',
@@ -45,7 +46,7 @@ const FACE_SHAPES = [
 
 type FaceShapeId = typeof FACE_SHAPES[number]['id'];
 
-const STYLE_VIBES = [
+export const STYLE_VIBES = [
   {
     id: 'angular',
     emoji: '📐',
@@ -68,7 +69,7 @@ const STYLE_VIBES = [
 
 type StyleVibeId = typeof STYLE_VIBES[number]['id'];
 
-const FRAME_SIZES = [
+export const FRAME_SIZES = [
   {
     id: 'small',
     emoji: '📏',
@@ -179,21 +180,26 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
   // Reset when closed
   useEffect(() => {
     if (!isOpen) {
-      setTimeout(() => {
+      const reset = setTimeout(() => {
         setStep(1); setGender(null);
         setFaceShape(null); setStyleVibe(null); setFrameSize(null); setShowResult(false);
       }, 300);
+      return () => clearTimeout(reset);
     }
   }, [isOpen]);
 
   // Handle direct open with pre-selected face shape (from FrameCarousel)
   useEffect(() => {
     const handleOpenQuiz = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail?.faceShape) {
-        setFaceShape(customEvent.detail.faceShape);
-        setStep(1); // Start at step 1 so they can choose gender
-      }
+      const detail = (e as CustomEvent).detail;
+      const answers = parseMorphologyQuiz(typeof detail?.quiz === 'string' ? detail.quiz : null);
+      const presetFace = FACE_SHAPES.find(face => face.id === detail?.faceShape);
+      setStep(1);
+      setShowResult(false);
+      setGender(answers?.gender ?? null);
+      setFaceShape(answers?.face ?? presetFace?.id ?? null);
+      setStyleVibe(answers?.style ?? null);
+      setFrameSize(answers?.size ?? null);
     };
     window.addEventListener('openQuizModal', handleOpenQuiz);
     return () => window.removeEventListener('openQuizModal', handleOpenQuiz);

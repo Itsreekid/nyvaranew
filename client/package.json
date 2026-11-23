@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/migrate-checkout.mjs && next start",
+    "migrate:checkout": "node scripts/migrate-checkout.mjs",
     "lint": "eslint"
   },
   "dependencies": {

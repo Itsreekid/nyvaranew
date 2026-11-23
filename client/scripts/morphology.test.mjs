@@ -9,8 +9,8 @@ import { readInlineImage } from '../src/lib/gemini-image.ts';
 
 const source = await readFile(new URL('../src/lib/morphology-quiz.ts', import.meta.url), 'utf8');
 const quizSource = stripTypeScriptTypes(source).replace(/^import .*$/gm, '').replace(/^export /gm, '');
-const { parseMorphologyQuiz, rankMorphologyProducts } = runInNewContext(
-  quizSource + '\n({ parseMorphologyQuiz, rankMorphologyProducts })', { ...morphology, ...stock },
+const { getMorphologyRecommendations, parseMorphologyQuiz, rankMorphologyProducts } = runInNewContext(
+  quizSource + '\n({ getMorphologyRecommendations, parseMorphologyQuiz, rankMorphologyProducts })', { ...morphology, ...stock },
 );
 
 test('normalizes Gemini and legacy labels while preserving multiple faces and unknown sizes', () => {
@@ -36,4 +36,22 @@ test('uses all quiz answers, keeps compatible sizes ahead of unknowns, and ranks
   assert.deepEqual(rank('homme,round,angular,medium'), ['rectangle', 'unknown', 'round', 'sold-out']);
   assert.equal(rank('femme,square,soft,small')[0], 'round');
   assert.equal(parseMorphologyQuiz('homme,round,medium'), null);
+
+  const unrelated = { ...base, id: 'unrelated', gender: 'homme' };
+  const candidates = [
+    { ...rectangle, gender: 'unisex' },
+    { ...unknown, gender: 'homme' },
+    { ...rectangle, id: 'wrong-face', gender: 'homme', ideal_faces: ['heart'] },
+    { ...round, gender: 'homme' },
+    { ...soldOut, gender: 'homme' },
+    { ...rectangle, id: 'wrong-gender', gender: 'femme' },
+    { ...watch, gender: 'unisex' },
+    unrelated,
+  ];
+  const results = getMorphologyRecommendations(candidates, parseMorphologyQuiz('homme,round,angular,medium'));
+  assert.deepEqual(Array.from(results.strong, product => product.id), ['rectangle']);
+  assert.deepEqual(Array.from(results.alternatives, product => product.id), ['unknown', 'wrong-face']);
+
+  const empty = getMorphologyRecommendations([unrelated], parseMorphologyQuiz('homme,heart,soft,large'));
+  assert.equal(empty.strong.length + empty.alternatives.length, 0);
 });

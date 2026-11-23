@@ -1,3 +1,18 @@
+.quizPreferences,
+.quizActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 20px;
+  margin-top: 16px;
+}
+.quizPreferences dt { color: var(--color-grey); font-size: 12px; }
+.quizPreferences dd { margin: 3px 0 0; font-weight: 600; }
+.quizActions a { text-decoration: none; }
+.quizSection + .quizSection { margin-top: 32px; }
+.quizSection h2 { font-size: 1.25rem; margin-bottom: 16px; }
+.quizNotice { margin: 0 0 24px; }
+
 .page { min-height: 100vh; }
 
 /* ─── Page Header ────────────────────────────── */

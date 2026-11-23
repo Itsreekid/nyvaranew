@@ -2,6 +2,9 @@
 
 import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { FACE_SHAPES, FRAME_SIZES, STYLE_VIBES } from '@/components/layout/FindYourFit';
+import { parseMorphologyQuiz, type MorphologyQuiz } from '@/lib/morphology-quiz';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 import FilterSidebar from '@/components/shop/FilterSidebar';
@@ -62,7 +65,7 @@ function ShopContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, urlCategorySlug]);
 
-  const { products, loading, error, totalCount } = useProducts(filters, sort, true, searchParams.get('quiz') ?? undefined);
+  const { products, loading, error, totalCount } = useProducts(filters, sort, true);
 
   const updateFilters = (newFilters: ProductFilters & { page?: number; pageSize?: number }) => {
     setFilters(newFilters);
@@ -191,10 +194,117 @@ function ShopContent() {
   );
 }
 
+function QuizActions({ token }: { token?: string }) {
+  const { language } = useLanguage();
+  const openQuiz = (quiz?: string) => window.dispatchEvent(new CustomEvent('openQuizModal', { detail: { quiz } }));
+  return (
+    <nav className={styles.quizActions} aria-label={language === 'fr' ? 'Actions du quiz' : 'خيارات الاختبار'}>
+      {token && <button type="button" className={styles.paginationBtn} onClick={() => openQuiz(token)}>
+        {language === 'fr' ? 'Modifier mes réponses' : 'بدّل إجاباتك'}
+      </button>}
+      <button type="button" className={styles.paginationBtn} onClick={() => openQuiz()}>
+        {language === 'fr' ? 'Recommencer le quiz' : 'عاود الاختبار'}
+      </button>
+      <Link className={styles.paginationBtn} href="/shop">
+        {language === 'fr' ? 'Voir toute la boutique' : 'شوف المتجر الكل'}
+      </Link>
+    </nav>
+  );
+}
+
+function QuizResults({ token, quiz }: { token: string; quiz: MorphologyQuiz }) {
+  const { language } = useLanguage();
+  const fr = language === 'fr';
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+  const { products, alternatives, strongCount, totalCount, loading, error } = useProducts(
+    { page, pageSize }, undefined, true, token,
+  );
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const face = FACE_SHAPES.find(item => item.id === quiz.face)?.label[language];
+  const style = STYLE_VIBES.find(item => item.id === quiz.style)?.label[language];
+  const size = FRAME_SIZES.find(item => item.id === quiz.size)?.label[language];
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <div className={styles.pageHeaderInner}>
+          <h1 className={styles.pageTitle}>{fr ? 'Vos montures recommandées' : 'الإطارات اللي تناسبك'}</h1>
+          <dl className={styles.quizPreferences}>
+            <div><dt>{fr ? 'Forme du visage' : 'شكل الوجه'}</dt><dd>{face}</dd></div>
+            <div><dt>{fr ? 'Style' : 'الستايل'}</dt><dd>{style}</dd></div>
+            <div><dt>{fr ? 'Taille souhaitée' : 'الحجم المطلوب'}</dt><dd>{size}</dd></div>
+          </dl>
+          <QuizActions token={token} />
+        </div>
+      </header>
+      <div className={styles.content}>
+        {loading || error ? <ProductGrid products={[]} loading={loading} error={error} /> : (
+          <>
+            {strongCount === 0 && (
+              <p className={styles.quizNotice} role="status">
+                {totalCount === 0
+                  ? (fr ? 'Aucune monture disponible ne correspond à vos réponses. Vous pouvez modifier vos réponses ou parcourir la boutique.' : 'ما فماش إطار متوفر يناسب إجاباتك. تنجم تبدّل إجاباتك أو تشوف المتجر.')
+                  : (fr ? 'Aucune monture disponible ne correspond à tous vos critères. Voici des alternatives qui répondent à une partie de vos préférences.' : 'ما فماش إطار يطابق الشروط الكل. هاذم بدائل تناسب بعض اختياراتك.')}
+              </p>
+            )}
+            {products.length > 0 && (
+              <section className={styles.quizSection}>
+                <h2>{fr ? 'Vos meilleures correspondances' : 'أحسن الاختيارات ليك'}</h2>
+                <ProductGrid products={products} />
+              </section>
+            )}
+            {alternatives.length > 0 && (
+              <section className={styles.quizSection}>
+                <h2>{fr ? 'Autres montures à découvrir' : 'إطارات أخرى تنجم تعجبك'}</h2>
+                <ProductGrid products={alternatives} />
+              </section>
+            )}
+            {totalPages > 1 && (
+              <nav className={styles.pagination} aria-label="Pagination">
+                <button type="button" className={styles.paginationBtn} disabled={page === 0} onClick={() => setPage(page - 1)}>
+                  ← {getTranslation(language, 'shop.prev')}
+                </button>
+                <span className={styles.paginationInfo}>Page {page + 1} / {totalPages}</span>
+                <button type="button" className={styles.paginationBtn} disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>
+                  {getTranslation(language, 'shop.next')} →
+                </button>
+              </nav>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ShopView() {
+  const params = useSearchParams();
+  const { language } = useLanguage();
+  const tokens = params.getAll('quiz');
+  if (!tokens.length) return <ShopContent />;
+  const quiz = tokens.length === 1 ? parseMorphologyQuiz(tokens[0]) : null;
+  if (quiz) return <QuizResults key={tokens[0]} token={tokens[0]} quiz={quiz} />;
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <div className={styles.pageHeaderInner}>
+          <h1 className={styles.pageTitle}>{language === 'fr' ? 'Vos montures recommandées' : 'الإطارات اللي تناسبك'}</h1>
+          <p className={styles.pageSubtitle} role="alert">
+            {language === 'fr' ? 'Les réponses du quiz sont manquantes ou invalides. Recommencez le quiz pour voir vos recommandations.' : 'إجابات الاختبار ناقصة أو غالطة. عاود الاختبار باش تشوف الاختيارات.'}
+          </p>
+          <QuizActions />
+        </div>
+      </header>
+    </div>
+  );
+}
+
 export default function ShopPage() {
   return (
     <Suspense fallback={<div style={{ minHeight: '60vh' }} />}>
-      <ShopContent />
+      <ShopView />
     </Suspense>
   );
 }
