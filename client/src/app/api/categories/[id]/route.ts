@@ -6,12 +6,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const { name, homepage_config } = await req.json();
-    if (typeof name !== 'string' || !name.trim()) return NextResponse.json({ error: 'Nom de catégorie requis.' }, { status: 400 });
-    if (homepage_config !== undefined) {
-      await sql`UPDATE categories SET name = ${name.trim()}, homepage_config = ${sql.json(readCategoryConfig(homepage_config))} WHERE id = ${id}::uuid`;
-    } else {
-      await sql`UPDATE categories SET name = ${name.trim()} WHERE id = ${id}::uuid`;
+    if ((name !== undefined && (typeof name !== 'string' || !name.trim()))
+      || (name === undefined && homepage_config === undefined)) {
+      return NextResponse.json({ error: 'Nom ou réglages de catégorie requis.' }, { status: 400 });
     }
+    const rename = name === undefined ? sql`` : sql`name = ${name.trim()},`;
+    const rows = homepage_config !== undefined
+      ? await sql`UPDATE categories SET ${rename}
+          homepage_config = ${sql.json(readCategoryConfig(homepage_config))} WHERE id = ${id}::uuid RETURNING id`
+      : await sql`UPDATE categories SET name = ${name.trim()} WHERE id = ${id}::uuid RETURNING id`;
+    if (!rows.length) return NextResponse.json({ error: 'Catégorie introuvable.' }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     const error = err.code === '42703' ? 'Appliquez la migration des catégories pour enregistrer les réglages d’accueil.' : err.message;

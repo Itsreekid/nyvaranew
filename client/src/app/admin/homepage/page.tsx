@@ -175,9 +175,9 @@ export default function HomepageSettingsPage() {
         <details style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #eee' }}>
           <summary style={{ cursor: 'pointer', fontSize: '18px', fontWeight: 700 }}>Catégories de l’accueil</summary>
           <p style={{ margin: '12px 0 20px', color: '#5d554a', fontSize: '14px' }}>
-            Ajoutez des catégories et réglez leur icône, leur visibilité et leur ordre sur l’accueil. Chaque catégorie s’enregistre séparément.
+            Choisissez une catégorie existante pour régler son icône, sa visibilité et son ordre sur l’accueil.
           </p>
-          <CategoryManager />
+          <CategoryManager homepageOnly />
         </details>
       </div>
     </div>
