@@ -29,8 +29,8 @@
   background: #FAFAF8;
   border-radius: 20px;
   width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
+  max-width: 600px;
+  max-height: 90dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -60,15 +60,15 @@
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--color-gold);
+  color: #755828;
 }
 
 .closeBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   color: var(--color-grey);
   transition: background 0.2s, color 0.2s;
@@ -81,18 +81,18 @@
 
 /* ─── Progress Bar ──────────────────────────────────────── */
 .progressBar {
-  height: 2px;
-  background: var(--color-cream-dark);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   margin: 14px 28px 0;
-  border-radius: 2px;
-  overflow: hidden;
+  flex-shrink: 0;
 }
-.progressFill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-gold), #e8c77a);
-  border-radius: 2px;
-  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.progressBar span {
+  height: 4px;
+  background: var(--color-cream-dark);
+  border-radius: 4px;
 }
+.progressBar span[data-active='true'] { background: var(--color-gold); }
 
 /* ─── Body ──────────────────────────────────────────────── */
 .body {
@@ -160,12 +160,12 @@
 .checkMark {
   position: absolute;
   top: 10px;
-  right: 10px;
+  inset-inline-end: 10px;
   width: 20px;
   height: 20px;
   border-radius: 50%;
   background: var(--color-gold);
-  color: #fff;
+  color: #271d10;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,8 +178,20 @@
 }
 
 .cardIcon {
-  font-size: 2rem;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #f6f3ed;
+  color: #635036;
+}
+.cardIcon svg { width: 25px; height: 25px; stroke-width: 1.6; }
+.cardSelected .cardIcon { background: #f0e4cc; color: #574220; }
+.modal :is(button, a):focus-visible {
+  outline: 2px solid #8b6934;
+  outline-offset: 3px;
 }
 .cardLabel {
   font-size: 13px;
@@ -195,6 +207,9 @@
 
 /* ─── Tip Box ───────────────────────────────────────────── */
 .tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   margin-top: 20px;
   padding: 14px 16px;
   background: rgba(201,169,110,0.08);
@@ -205,14 +220,18 @@
   line-height: 1.6;
 }
 
+.tip svg { flex-shrink: 0; margin-top: 2px; color: #76603b; }
+
 /* ─── Navigation Buttons ────────────────────────────────── */
 .footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 28px 28px;
+  padding: 12px 28px 24px;
   flex-shrink: 0;
+  border-top: 1px solid var(--color-cream-dark);
+  background: #fafaf8;
 }
 .backBtn {
   display: flex;
@@ -241,7 +260,8 @@
   letter-spacing: 0.04em;
   border-radius: 10px;
   transition: background 0.2s, transform 0.15s;
-  margin-left: auto;
+  margin-inline-start: auto;
+  min-height: 44px;
 }
 .nextBtn:hover:not(:disabled) {
   background: #2a2a2a;
@@ -288,18 +308,28 @@
   margin-bottom: 8px;
 }
 
-.resultsSize {
-  display: inline-block;
-  margin-bottom: 18px;
-  padding: 4px 14px;
-  background: var(--color-black);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  border-radius: 6px;
+.answerSummary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 18px;
 }
+.answerSummary li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e7dbc4;
+  border-radius: 8px;
+  background: #fff;
+  color: #574220;
+  font-size: 12px;
+  font-weight: 600;
+}
+.answerSummary svg { width: 14px; height: 14px; flex-shrink: 0; }
 
 .resultsDesc {
   font-size: 14px;
@@ -325,7 +355,7 @@
   width: 100%;
   padding: 14px 24px;
   background: var(--color-gold);
-  color: #fff;
+  color: #271d10;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -409,8 +439,35 @@
 
 /* ─── Responsive ────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .modal { border-radius: 16px 16px 0 0; max-height: 92vh; }
+  .modal { border-radius: 18px 18px 0 0; max-height: 94dvh; }
   .overlay { align-items: flex-end; padding: 0; }
+  .header { padding: 16px 18px 0; }
+  .progressBar { margin-inline: 18px; }
+  .body, .results { padding: 22px 18px; }
   .stepTitle { font-size: 1.45rem; }
-  .grid3 { grid-template-columns: 1fr 1fr; }
+  .stepSub { margin-bottom: 16px; }
+  .grid { gap: 10px; }
+  .card { padding: 13px 10px; }
+  .cardIcon { width: 40px; height: 40px; }
+  .cardIcon svg { width: 22px; height: 22px; }
+  .grid3 { grid-template-columns: 1fr; }
+  .grid3 .card {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 2px 12px;
+    padding-inline-end: 38px;
+    text-align: start;
+  }
+  .grid3 .cardIcon { grid-row: span 2; }
+  .footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 10px 18px max(14px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .modal, .body, .results, .checkMark { animation: none; }
+  .card, .nextBtn, .primaryCta { transition: none; }
 }

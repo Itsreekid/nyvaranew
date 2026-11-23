@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { parseMorphologyQuiz } from '@/lib/morphology-quiz';
-import { X, ChevronRight, ChevronLeft, RotateCcw, ArrowRight, Check, Sparkles } from 'lucide-react';
+import {
+  X, ChevronRight, ChevronLeft, RotateCcw, ArrowRight, Check, Glasses,
+  Circle, Square, Ellipse, Heart, TriangleRight, Waves, Shapes,
+  Minimize2, MoveHorizontal, Maximize2, UserRound, ContactRound, Ruler, Info,
+} from 'lucide-react';
 import { useLanguage, type Lang } from '@/context/LanguageContext';
 import styles from './FindYourFit.module.css';
 
@@ -12,7 +16,7 @@ import styles from './FindYourFit.module.css';
 export const FACE_SHAPES = [
   {
     id: 'round',
-    emoji: '⚪',
+    icon: Circle,
     label: { fr: 'Rond', ar: 'وجه دائري' },
     sub: { fr: 'Angles doux, largeur et longueur égales', ar: 'زوايا ناعمة، العرض قد الطول' },
     frames: { fr: ['Rectangulaire', 'Carrée', 'Demi-monture'], ar: ['مستطيل', 'مربع كلاسيكي', 'نصف إطار'] },
@@ -20,7 +24,7 @@ export const FACE_SHAPES = [
   },
   {
     id: 'square',
-    emoji: '🔲',
+    icon: Square,
     label: { fr: 'Carré', ar: 'وجه مربع' },
     sub: { fr: 'Mâchoire forte, angles marqués', ar: 'فك بارز، زوايا واضحة' },
     frames: { fr: ['Rond', 'Ovale', 'Aviateur'], ar: ['دائري', 'بيضاوي', 'طيار (Aviateur)'] },
@@ -28,7 +32,7 @@ export const FACE_SHAPES = [
   },
   {
     id: 'oval',
-    emoji: '🥚',
+    icon: Ellipse,
     label: { fr: 'Ovale', ar: 'وجه بيضاوي' },
     sub: { fr: 'Proportions équilibrées, menton doux', ar: 'متوازن برشا، ذقن ناعم' },
     frames: { fr: ['Carrée', 'Rectangulaire', 'Géométrique'], ar: ['مربع كلاسيكي', 'مربع', 'هندسي'] },
@@ -36,7 +40,7 @@ export const FACE_SHAPES = [
   },
   {
     id: 'heart',
-    emoji: '❤️',
+    icon: Heart,
     label: { fr: 'Cœur', ar: 'وجه على شكل قلب' },
     sub: { fr: 'Front large, menton pointu', ar: 'جبهة عريضة، ذقن جويد' },
     frames: { fr: ['Aviateur', 'Rond', 'Œil-de-chat'], ar: ['طيار (Aviateur)', 'دائري', 'عين القطة'] },
@@ -49,19 +53,19 @@ type FaceShapeId = typeof FACE_SHAPES[number]['id'];
 export const STYLE_VIBES = [
   {
     id: 'angular',
-    emoji: '📐',
+    icon: TriangleRight,
     label: { fr: 'GÉOMÉTRIQUE & STRUCTURÉ', ar: 'حادة وزاوية' },
     sub: { fr: 'Ajoute de la définition au visage', ar: 'تبرز وتحدد الوجه' },
   },
   {
     id: 'soft',
-    emoji: '☁️',
+    icon: Waves,
     label: { fr: 'DOUX & ARRONDI', ar: 'ناعمة ودائرية' },
     sub: { fr: 'Adoucit les traits marqués', ar: 'تخفف من الزوايا الحادة' },
   },
   {
     id: 'all',
-    emoji: '✨',
+    icon: Shapes,
     label: { fr: 'TOUS LES STYLES', ar: 'وريني كل الستايلات' },
     sub: { fr: 'Ouvert à toutes les options', ar: 'منفتح على كل الخيارات' },
   },
@@ -72,21 +76,21 @@ type StyleVibeId = typeof STYLE_VIBES[number]['id'];
 export const FRAME_SIZES = [
   {
     id: 'small',
-    emoji: '📏',
+    icon: Minimize2,
     label: { fr: 'Petit / Étroit', ar: 'صغير / ضيق' },
     sub: { fr: '< 130 mm (largeur)', ar: 'أقل من 130 مم (العرض)' },
     sizeKey: { fr: 'Petit', ar: 'صغير (Small)' },
   },
   {
     id: 'medium',
-    emoji: '👍',
+    icon: MoveHorizontal,
     label: { fr: 'Moyen / Standard', ar: 'متوسط / قياسي' },
     sub: { fr: '130 mm – 138 mm (largeur)', ar: '130 مم – 138 مم (العرض)' },
     sizeKey: { fr: 'Moyen', ar: 'متوسط (Medium)' },
   },
   {
     id: 'large',
-    emoji: '😎',
+    icon: Maximize2,
     label: { fr: 'Grand / Large', ar: 'كبير / عريض' },
     sub: { fr: '> 138 mm (largeur)', ar: 'أكثر من 138 مم (العرض)' },
     sizeKey: { fr: 'Large', ar: 'كبير (Large)' },
@@ -112,9 +116,8 @@ function getRecommendation(faceId: FaceShapeId, sizeId: FrameSizeId) {
 const UI_TEXT = {
   header: { fr: 'Étape', ar: 'الخطوة' },
   of: { fr: 'sur', ar: 'من' },
-  resultTitle: { fr: '✨ Votre Recommandation', ar: '✨ نظارتك المثالية' },
+  resultTitle: { fr: 'Votre Recommandation', ar: 'نظارتك المثالية' },
   badge: { fr: 'Montures Recommandées', ar: 'الإطارات المنصوح بيها' },
-  sizeLabel: { fr: 'Taille souhaitée :', ar: 'الحجم المطلوب:' },
   browse: { fr: 'Voir les montures', ar: 'شوف النظارات اللي تناسبك' },
   retake: { fr: 'Recommencer', ar: 'عاود الكويز' },
   back: { fr: 'Retour', ar: 'رجوع' },
@@ -136,8 +139,8 @@ const UI_TEXT = {
   step5Title: { fr: 'Quelle est votre taille de monture ?', ar: 'شنوا حجم النظارة المفضل عندك؟' },
   step5Sub: { fr: 'Comparez avec la largeur totale d’une monture qui vous va bien.', ar: 'قارن مع العرض الكلّي متاع إطار يواتيك.' },
   step5Tip: { 
-    fr: '💡 Mesurez la largeur totale, d’un bord extérieur à l’autre.',
-    ar: '💡 قيس العرض الكلّي من طرف الإطار للطرف الآخر.'
+    fr: 'Mesurez la largeur totale, d’un bord extérieur à l’autre.',
+    ar: 'قيس العرض الكلّي من طرف الإطار للطرف الآخر.'
   },
 };
 
@@ -207,8 +210,6 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
 
   if (!isOpen) return null;
 
-  const progress = showResult ? 100 : (step / TOTAL_STEPS) * 100;
-
   const canNext =
     (step === 1 && gender !== null) ||
     (step === 2 && faceShape !== null) ||
@@ -235,21 +236,23 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
     : null;
 
   return (
-    <div className={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true">
+    <div className={styles.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-labelledby="fit-quiz-title">
       <div className={styles.modal}>
         {/* ── Header ── */}
         <div className={styles.header}>
           <span className={styles.stepLabel}>
             {showResult ? t('resultTitle') : `${t('header')} ${step} ${t('of')} ${TOTAL_STEPS}`}
           </span>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
+          <button className={styles.closeBtn} onClick={onClose} aria-label={l === 'fr' ? 'Fermer le quiz' : 'سكر الاختبار'}>
             <X size={18} />
           </button>
         </div>
 
         {/* ── Progress bar ── */}
-        <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+        <div className={styles.progressBar} aria-hidden="true">
+          {Array.from({ length: TOTAL_STEPS }, (_, index) => (
+            <span key={index} data-active={showResult || index < step} />
+          ))}
         </div>
 
         {/* ══════════════════════════════════════
@@ -258,13 +261,17 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
         {showResult && rec ? (
           <div className={styles.results} key="results">
             <div className={styles.resultsBadge}>
-              <Sparkles size={12} />
+              <Glasses size={12} />
               {t('badge')}
             </div>
-            <h2 className={styles.resultsTitle}>
+            <h2 id="fit-quiz-title" className={styles.resultsTitle}>
               {rec.frames[l].join(l === 'fr' ? ' & ' : ' و ')}
             </h2>
-            <span className={styles.resultsSize}>{t('sizeLabel')} {rec.sizeLabel[l]}</span>
+            <ul className={styles.answerSummary}>
+              <li><Ellipse aria-hidden="true" />{FACE_SHAPES.find(option => option.id === faceShape)?.label[l]}</li>
+              <li><Shapes aria-hidden="true" />{STYLE_VIBES.find(option => option.id === styleVibe)?.label[l]}</li>
+              <li><Ruler aria-hidden="true" />{rec.sizeLabel[l]}</li>
+            </ul>
             <p className={styles.resultsDesc}>{rec.why[l]}</p>
 
             <div className={styles.resultsCtas}>
@@ -274,7 +281,7 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
                 onClick={onClose}
               >
                 {t('browse')}
-                <ArrowRight size={16} />
+                {l === 'ar' ? <ChevronLeft size={16} aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />}
               </Link>
               <button className={styles.secondaryCta} onClick={handleRetake}>
                 <RotateCcw size={14} />
@@ -289,23 +296,25 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
             ══════════════════════════════════════ */}
             {step === 1 && (
               <div className={styles.body} key="step1">
-                <h2 className={styles.stepTitle}>{t('step2Title')}</h2>
+                <h2 id="fit-quiz-title" className={styles.stepTitle}>{t('step2Title')}</h2>
                 <p className={styles.stepSub}>{t('step2Sub')}</p>
                 <div className={styles.grid}>
                   <button
+                    aria-pressed={gender === 'homme'}
                     className={`${styles.card} ${gender === 'homme' ? styles.cardSelected : ''}`}
                     onClick={() => { setGender('homme'); setStep(2); }}
                   >
                     {gender === 'homme' && <span className={styles.checkMark}><Check size={11} /></span>}
-                    <span className={styles.cardIcon}>👨</span>
+                    <span className={styles.cardIcon}><UserRound aria-hidden="true" /></span>
                     <span className={styles.cardLabel}>{l === 'fr' ? 'Homme' : 'للرجال'}</span>
                   </button>
                   <button
+                    aria-pressed={gender === 'femme'}
                     className={`${styles.card} ${gender === 'femme' ? styles.cardSelected : ''}`}
                     onClick={() => { setGender('femme'); setStep(2); }}
                   >
                     {gender === 'femme' && <span className={styles.checkMark}><Check size={11} /></span>}
-                    <span className={styles.cardIcon}>👩</span>
+                    <span className={styles.cardIcon}><ContactRound aria-hidden="true" /></span>
                     <span className={styles.cardLabel}>{l === 'fr' ? 'Femme' : 'للنساء'}</span>
                   </button>
                 </div>
@@ -317,19 +326,20 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
             ══════════════════════════════════════ */}
             {step === 2 && (
               <div className={styles.body} key="step2">
-                <h2 className={styles.stepTitle}>{t('step3Title')}</h2>
+                <h2 id="fit-quiz-title" className={styles.stepTitle}>{t('step3Title')}</h2>
                 <p className={styles.stepSub}>{t('step3Sub')}</p>
                 <div className={styles.grid}>
                   {FACE_SHAPES.map(s => (
                     <button
                       key={s.id}
+                      aria-pressed={faceShape === s.id}
                       className={`${styles.card} ${faceShape === s.id ? styles.cardSelected : ''}`}
                       onClick={() => setFaceShape(s.id)}
                     >
                       {faceShape === s.id && (
                         <span className={styles.checkMark}><Check size={11} /></span>
                       )}
-                      <span className={styles.cardIcon}>{s.emoji}</span>
+                      <span className={styles.cardIcon}><s.icon aria-hidden="true" /></span>
                       <span className={styles.cardLabel}>{s.label[l]}</span>
                       <span className={styles.cardSub}>{s.sub[l]}</span>
                     </button>
@@ -343,19 +353,20 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
             ══════════════════════════════════════ */}
             {step === 3 && (
               <div className={styles.body} key="step3">
-                <h2 className={styles.stepTitle}>{t('step4Title')}</h2>
+                <h2 id="fit-quiz-title" className={styles.stepTitle}>{t('step4Title')}</h2>
                 <p className={styles.stepSub}>{t('step4Sub')}</p>
                 <div className={styles.grid}>
                   {STYLE_VIBES.map(v => (
                     <button
                       key={v.id}
+                      aria-pressed={styleVibe === v.id}
                       className={`${styles.card} ${styleVibe === v.id ? styles.cardSelected : ''}`}
                       onClick={() => setStyleVibe(v.id)}
                     >
                       {styleVibe === v.id && (
                         <span className={styles.checkMark}><Check size={11} /></span>
                       )}
-                      <span className={styles.cardIcon}>{v.emoji}</span>
+                      <span className={styles.cardIcon}><v.icon aria-hidden="true" /></span>
                       <span className={styles.cardLabel}>{v.label[l]}</span>
                       <span className={styles.cardSub}>{v.sub[l]}</span>
                     </button>
@@ -369,26 +380,28 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
             ══════════════════════════════════════ */}
             {step === 4 && (
               <div className={styles.body} key="step4">
-                <h2 className={styles.stepTitle}>{t('step5Title')}</h2>
+                <h2 id="fit-quiz-title" className={styles.stepTitle}>{t('step5Title')}</h2>
                 <p className={styles.stepSub}>{t('step5Sub')}</p>
                 <div className={`${styles.grid} ${styles.grid3}`}>
                   {FRAME_SIZES.map(sz => (
                     <button
                       key={sz.id}
+                      aria-pressed={frameSize === sz.id}
                       className={`${styles.card} ${frameSize === sz.id ? styles.cardSelected : ''}`}
                       onClick={() => setFrameSize(sz.id)}
                     >
                       {frameSize === sz.id && (
                         <span className={styles.checkMark}><Check size={11} /></span>
                       )}
-                      <span className={styles.cardIcon}>{sz.emoji}</span>
+                      <span className={styles.cardIcon}><sz.icon aria-hidden="true" /></span>
                       <span className={styles.cardLabel}>{sz.label[l]}</span>
                       <span className={styles.cardSub}>{sz.sub[l]}</span>
                     </button>
                   ))}
                 </div>
                 <div className={styles.tip}>
-                  {t('step5Tip')}
+                  <Info size={16} aria-hidden="true" />
+                  <span>{t('step5Tip')}</span>
                 </div>
               </div>
             )}
@@ -397,16 +410,16 @@ export default function FindYourFit({ isOpen, onClose }: FindYourFitProps) {
             <div className={styles.footer}>
               {step > 1 ? (
                 <button className={styles.backBtn} onClick={handleBack}>
-                  <ChevronLeft size={16} />
+                  {l === 'ar' ? <ChevronRight size={16} aria-hidden="true" /> : <ChevronLeft size={16} aria-hidden="true" />}
                   {t('back')}
                 </button>
               ) : <span />}
 
               <button className={styles.nextBtn} onClick={handleNext} disabled={!canNext}>
                 {step === TOTAL_STEPS ? (
-                  <>{t('seeFit')} <Sparkles size={15} /></>
+                  <>{t('seeFit')} <Glasses size={15} /></>
                 ) : (
-                  <>{t('next')} <ChevronRight size={16} /></>
+                  <>{t('next')} {l === 'ar' ? <ChevronLeft size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}</>
                 )}
               </button>
             </div>
@@ -428,7 +441,7 @@ interface FitButtonProps {
 export function FindYourFitButton({ onClick, className, label = 'Quiz Morphologie' }: FitButtonProps) {
   return (
     <button className={`${styles.triggerBtn} ${className || ''}`} onClick={onClick}>
-      <Sparkles size={16} />
+      <Glasses size={16} />
       <span>{label}</span>
     </button>
   );
@@ -437,7 +450,7 @@ export function FindYourFitButton({ onClick, className, label = 'Quiz Morphologi
 export function FindYourFitMobileButton({ onClick, label = 'Quiz IA' }: { onClick: () => void, label?: string }) {
   return (
     <button className={styles.mobileTriggerBtn} onClick={onClick}>
-      <Sparkles size={18} className={styles.mobileTriggerIcon} />
+      <Glasses size={18} className={styles.mobileTriggerIcon} />
       <span>{label}</span>
     </button>
   );
