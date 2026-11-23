@@ -6,7 +6,10 @@ import { sql } from '@/lib/db';
 
 export const revalidate = 0;
 
-interface Props { params: Promise<{ id: string }>; }
+interface Props {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ color?: string | string[] }>;
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -18,8 +21,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ProductPage({ params }: Props) {
+export default async function ProductPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { color } = await searchParams;
+  const initialColorId = typeof color === 'string' ? color : undefined;
 
   const [productRows, galleryRows] = await Promise.all([
     sql`
@@ -109,5 +114,5 @@ export default async function ProductPage({ params }: Props) {
   const gallery: { id: string; image_url: string }[] = galleryRows as any[];
   const related: Product[] = relatedRows as unknown as Product[];
 
-  return <ProductDetail product={product as Product} gallery={gallery} related={related} />;
+  return <ProductDetail key={`${id}:${initialColorId ?? ''}`} product={product as Product} gallery={gallery} related={related} initialColorId={initialColorId} />;
 }

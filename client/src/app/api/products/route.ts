@@ -65,6 +65,26 @@ export async function GET(request: NextRequest) {
     else if (sort === "price_desc" || sort === "price-desc") orderBy = "p.price DESC";
     else if (sort === "tendance") orderBy = "p.review_count DESC NULLS LAST, p.rating DESC NULLS LAST";
 
+    if (searchParams.get("outOfStockLast") === "true") {
+      // Match the whole-product availability shown on shop cards.
+      orderBy = `(p.is_active IS FALSE
+        OR (COALESCE(p.stock, 0) <= 0 AND p.allow_unlimited_stock IS NOT TRUE)
+        OR (SELECT COALESCE(bool_and(color->'isAvailable' = 'false'::jsonb IS TRUE), false)
+            FROM LATERAL (
+              SELECT CASE
+                WHEN jsonb_typeof(p.color_options::jsonb) = 'array' THEN p.color_options::jsonb
+                WHEN jsonb_typeof(p.color_options::jsonb) = 'string'
+                  AND left(ltrim(p.color_options::jsonb #>> '{}'), 1) = '['
+                  AND right(rtrim(p.color_options::jsonb #>> '{}'), 1) = ']'
+                  THEN (p.color_options::jsonb #>> '{}')::jsonb
+                ELSE '[]'::jsonb
+              END AS variants
+            ) AS stored
+            CROSS JOIN LATERAL jsonb_array_elements(stored.variants) AS colors(color)
+            WHERE jsonb_typeof(color->'id') = 'string' AND color->>'id' <> '')
+        ) ASC, ${orderBy}, p.id ASC`;
+    }
+
     const noLimit = searchParams.get("noLimit") === "true";
 
     // Count query

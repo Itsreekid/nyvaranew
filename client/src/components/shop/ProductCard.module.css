@@ -206,6 +206,7 @@
 
   /* Hide "Add to Cart" text — icon only on very small cards */
   .addBtn span { display: none; }
+  .chooseColor { white-space: normal; text-align: center; letter-spacing: 0; }
 
   /* Keep wishlist button from overflowing */
   .wishlistBtn {

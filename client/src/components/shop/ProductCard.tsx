@@ -7,7 +7,9 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useState } from 'react';
 import Badge from '@/components/ui/Badge';
+import Toast from '@/components/ui/Toast';
 import type { Product } from '@/types';
+import { getProductColors, getProductThumbnail, isProductOutOfStock } from '@/lib/product-availability';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslation } from '@/locales/dictionary';
 import styles from './ProductCard.module.css';
@@ -24,7 +26,7 @@ const formatTND = (price: number | null) => {
 };
 
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
-  const { addItem, isInCart } = useCart();
+  const { addItems, isInCart } = useCart();
   const { addToWishlist, removeFromWishlist, isWishlisted } = useWishlist();
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
@@ -32,6 +34,8 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const inCart     = isInCart(product.id);
   const wishlisted = isWishlisted(product.id);
   const [wishlistDisabled, setWishlistDisabled] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
 
   // Discount calculation
   const hasDiscount     = product.discount != null && product.discount > 0;
@@ -39,12 +43,22 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     ? Math.round(product.price * (1 - product.discount! / 100))
     : null;
 
-  const isOutOfStock = product.is_active === false || ((product.stock ?? 0) <= 0 && product.allow_unlimited_stock !== true);
+  const colors = getProductColors(product.color_options);
+  const isOutOfStock = isProductOutOfStock(product, colors);
+  const thumbnail = getProductThumbnail(product.image_url || null, colors, isOutOfStock);
+  const needsColor = colors.length > 0;
+  const actionLabel = needsColor && !isOutOfStock ? t('product.chooseColorAction') : t('product.addToCart');
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault(); // prevent navigation when clicking Add to Cart
-    if (isOutOfStock) return;
-    addItem(product);
+    if (isOutOfStock || adding) return;
+    setAdding(true);
+    const issue = await addItems(product, [null]);
+    setAdding(false);
+    if (issue) {
+      setCartError(t(issue === 'network' ? 'product.checkStockError' : 'product.outOfStock'));
+      return;
+    }
     fbEvent.addToCart({
       content_ids:  [String(product.id)],
       content_name: product.title ?? 'Sunglasses',
@@ -83,16 +97,17 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   };
 
   return (
-    <Link href={`/shop/${product.id}`} style={{ textDecoration: 'none', pointerEvents: isOutOfStock ? 'none' : 'auto' }}>
+    <>
+    <Link href={`/shop/${product.id}`} style={{ textDecoration: 'none' }}>
       <article className={`${styles.card} ${isOutOfStock ? styles.outOfStockCard : ''}`} aria-label={product.title ?? 'Product'}>
         {/* Image */}
         <div className={styles.imageWrap}>
           {isOutOfStock && (
-            <div className={styles.outOfStockBadge}>Rupture de stock</div>
+            <div className={styles.outOfStockBadge}>{t('product.outOfStock')}</div>
           )}
-          {product.image_url ? (
+          {thumbnail ? (
             <Image
-              src={product.image_url}
+              src={thumbnail}
               alt={product.title ?? 'Sunglasses'}
               fill
               className={styles.image}
@@ -157,19 +172,25 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                 <p className={styles.price} style={{ color: 'var(--color-black)' }}>{formatTND(product.price)}</p>
               )}
             </div>
+            {needsColor && !isOutOfStock ? (
+              <span className={`${styles.addBtn} ${styles.chooseColor}`}>{actionLabel}</span>
+            ) : (
             <button
               className={`${styles.addBtn} ${inCart ? styles.inCart : ''}`}
               onClick={handleAddToCart}
-              aria-label={inCart ? 'Added to cart' : 'Add to cart'}
-              disabled={isOutOfStock}
+              aria-label={inCart && !needsColor ? t('product.addedToCart') : actionLabel}
+              disabled={isOutOfStock || adding}
               style={{ opacity: isOutOfStock ? 0.5 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer' }}
             >
               <ShoppingBag size={14} />
-              <span>{inCart ? '✔' : t('product.addToCart')}</span>
+              <span>{inCart && !needsColor ? '✔' : actionLabel}</span>
             </button>
+            )}
           </div>
         </div>
       </article>
     </Link>
+    {cartError && <Toast message={cartError} onClose={() => setCartError(null)} />}
+    </>
   );
 }

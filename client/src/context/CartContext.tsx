@@ -1,12 +1,13 @@
 'use client';
 
-import { createContext, useContext, useReducer, useCallback, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useReducer, useCallback, ReactNode, useEffect, useRef } from 'react';
 import type { CartItem, CartState, Product, ColorOption } from '@/types';
+import { getProductColors, getPurchasableColor, getQuantityBreaks, validatePurchase } from '@/lib/product-availability';
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 type CartAction =
-  | { type: 'ADD_ITEM'; product: Product; selected_color?: ColorOption }
+  | { type: 'ADD_ITEMS'; product: Product; colorIds: (string | undefined)[] }
   | { type: 'REMOVE_ITEM'; productId: string; colorId?: string }
   | { type: 'UPDATE_QUANTITY'; productId: string; colorId?: string; quantity: number }
   | { type: 'CLEAR_CART' }
@@ -16,15 +17,24 @@ type CartAction =
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
-    case 'ADD_ITEM': {
-      const existing = state.items.find(i => i.product.id === action.product.id && i.selected_color?.id === action.selected_color?.id);
-      const items = existing
-        ? state.items.map(i =>
-            i.product.id === action.product.id && i.selected_color?.id === action.selected_color?.id
-              ? { ...i, quantity: i.quantity + 1 }
-              : i
-          )
-        : [...state.items, { product: action.product, quantity: 1, selected_color: action.selected_color }];
+    case 'ADD_ITEMS': {
+      const { product, colorIds } = action;
+      const colors = getProductColors(product.color_options);
+      const alreadyInCart = state.items.filter(item => item.product.id === product.id);
+      const newSelections = colorIds.map(colorId => ({ colorId, quantity: 1 }));
+      if (validatePurchase(product, newSelections)
+        || (product.allow_unlimited_stock !== true
+          && alreadyInCart.reduce((total, item) => total + item.quantity, colorIds.length) > (product.stock ?? 0))) {
+        return state;
+      }
+      const items = [...state.items];
+      for (const colorId of colorIds) {
+        const index = items.findIndex(item => item.product.id === product.id && item.selected_color?.id === colorId);
+        const color = getPurchasableColor(colors, colorId);
+        const next = { product, selected_color: color, quantity: index === -1 ? 1 : items[index].quantity + 1 };
+        if (index === -1) items.push(next);
+        else items[index] = next;
+      }
       return buildState(items);
     }
     case 'REMOVE_ITEM': {
@@ -66,7 +76,7 @@ function buildState(items: CartItem[]): CartState {
       const totalQty = productTotals[i.product.id];
 
       // Check for quantity break based on total product quantity
-      const breaks = i.product.quantity_breaks || [];
+      const breaks = getQuantityBreaks(i.product.quantity_breaks);
       const applicableBreak = [...breaks]
         .sort((a, b) => b.min_qty - a.min_qty)
         .find(qb => totalQty >= qb.min_qty);
@@ -90,7 +100,7 @@ function buildState(items: CartItem[]): CartState {
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 interface CartContextValue extends CartState {
-  addItem:        (product: Product, selected_color?: ColorOption) => void;
+  addItems:       (product: Product, colors: (ColorOption | null)[]) => Promise<'stock' | 'color' | 'network' | null>;
   removeItem:     (productId: string, colorId?: string) => void;
   updateQuantity: (productId: string, colorId: string | undefined, quantity: number) => void;
   clearCart:      () => void;
@@ -103,6 +113,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0, itemCount: 0 });
+  const pendingProducts = useRef(new Set<string>());
 
   // ─── Persistence Logic ───────────────
 
@@ -126,14 +137,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('nyvara_cart', JSON.stringify(state));
   }, [state]);
 
-  const addItem        = useCallback((product: Product, selected_color?: ColorOption) => dispatch({ type: 'ADD_ITEM', product, selected_color }), []);
+  const addItems = useCallback<CartContextValue['addItems']>(async (product, colors) => {
+    const colorIds = colors.map(color => color?.id);
+    if (colorIds.length === 0) return 'stock';
+    if (pendingProducts.current.has(product.id)) return 'network';
+    pendingProducts.current.add(product.id);
+    const selections = [
+      ...state.items.filter(item => item.product.id === product.id)
+        .map(item => ({ quantity: item.quantity, colorId: item.selected_color?.id })),
+      ...colorIds.map(colorId => ({ quantity: 1, colorId })),
+    ];
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selections),
+      });
+      const result = await response.json();
+      if (response.status === 409) return result.issue === 'color' ? 'color' : 'stock';
+      if (!response.ok || !result.data) return 'network';
+      dispatch({ type: 'ADD_ITEMS', product: { ...product, ...result.data }, colorIds });
+      return null;
+    } catch {
+      return 'network';
+    } finally {
+      pendingProducts.current.delete(product.id);
+    }
+  }, [state.items]);
   const removeItem     = useCallback((productId: string, colorId?: string) => dispatch({ type: 'REMOVE_ITEM', productId, colorId }), []);
   const updateQuantity = useCallback((productId: string, colorId: string | undefined, quantity: number) => dispatch({ type: 'UPDATE_QUANTITY', productId, colorId, quantity }), []);
   const clearCart      = useCallback(() => dispatch({ type: 'CLEAR_CART' }), []);
   const isInCart       = useCallback((productId: string, colorId?: string) => state.items.some(i => i.product.id === productId && i.selected_color?.id === colorId), [state.items]);
 
   return (
-    <CartContext.Provider value={{ ...state, addItem, removeItem, updateQuantity, clearCart, isInCart }}>
+    <CartContext.Provider value={{ ...state, addItems, removeItem, updateQuantity, clearCart, isInCart }}>
       {children}
     </CartContext.Provider>
   );

@@ -11,6 +11,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import ProductCard from '@/components/shop/ProductCard';
 import type { Product, ColorOption } from '@/types';
+import { getColorPhoto, getImageColors, getProductColors, getProductGallery, getPurchasableColor, isColorImageSoldOut, isProductOutOfStock } from '@/lib/product-availability';
 import Toast from '@/components/ui/Toast';
 import styles from './product.module.css';
 import { fbEvent } from '@/components/analytics/FacebookPixel';
@@ -32,6 +33,7 @@ interface Props {
   product: Product;
   gallery: GalleryImage[];
   related: Product[];
+  initialColorId?: string;
 }
 
 const SLIDE_INTERVAL = 3500;
@@ -53,14 +55,13 @@ function Stars({ rating }: { rating: number | null }) {
   );
 }
 
-export default function ProductDetail({ product, gallery, related }: Props) {
+export default function ProductDetail({ product, gallery, related, initialColorId }: Props) {
   const router = useRouter();
   const { language } = useLanguage();
   const t = (path: string) => getTranslation(language, path);
-  const { addItem, isInCart }                             = useCart();
+  const { addItems, isInCart }                             = useCart();
   const { addToWishlist, removeFromWishlist, isWishlisted } = useWishlist();
 
-  const inCart     = isInCart(product.id);
   const wishlisted = isWishlisted(product.id);
 
   // ── Meta Pixel: ViewContent (once per product page load) ─────────────
@@ -91,8 +92,10 @@ export default function ProductDetail({ product, gallery, related }: Props) {
     ? Math.round(product.price * (1 - product.discount! / 100))
     : null;
 
-  const isOutOfStock = product.is_active === false || ((product.stock ?? 0) <= 0 && product.allow_unlimited_stock !== true);
-  const inStockBool = !isOutOfStock;
+  const safeColorOptions = getProductColors(product.color_options);
+  const initialColor = safeColorOptions.find(color => color.id === initialColorId);
+  const inStockBool = !isProductOutOfStock(product, safeColorOptions);
+  const hasQuantityBreaks = Boolean(product.quantity_breaks?.length);
 
   // Parse features (newline-separated)
   const featuresList = product.features
@@ -103,71 +106,50 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   const specEntries = product.specs ? Object.entries(product.specs) : [];
 
   // Colors — support multiple selections for bundles
-  const [selectedColors, setSelectedColors] = useState<(ColorOption | null)[]>([]);
+  const [selectedColors, setSelectedColors] = useState<(ColorOption | null)[]>([initialColor ?? null]);
   const [qty, setQty] = useState(1);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hasShake, setHasShake] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   // Initialize/resize selectedColors when qty changes
   useEffect(() => {
     setSelectedColors(prev => {
       const next = [...prev];
-      if (next.length > qty) return next.slice(0, qty);
-      while (next.length < qty) next.push(null);
+      const slots = hasQuantityBreaks ? qty : 1;
+      if (next.length > slots) return next.slice(0, slots);
+      while (next.length < slots) next.push(null);
       return next;
     });
-  }, [qty]);
+  }, [qty, hasQuantityBreaks]);
 
-  // For the gallery, we'll track the last selected color to know which image to show
-  const [lastSelectedColor, setLastSelectedColor] = useState<ColorOption | null>(null);
+  const mainImage = product.image_url || null;
+  const allImages = getProductGallery(mainImage, safeColorOptions, gallery.map(image => image.image_url));
+  const imageIndexForColor = (color: ColorOption) =>
+    Math.max(0, allImages.indexOf(getColorPhoto(color, mainImage) ?? ''));
 
-  const parseColorOptions = (options: any): ColorOption[] => {
-    if (!options) return [];
-    if (typeof options === 'string') {
-      try {
-        return JSON.parse(options);
-      } catch (e) {
-        return [];
-      }
-    }
-    return Array.isArray(options) ? options : [];
-  };
-
-  const safeColorOptions = parseColorOptions(product.color_options);
-
-  const isImageOutOfStock = (src: string | null) => {
-    if (!src) return false;
-    const colorsUsingThisImage = safeColorOptions.filter(co => co.image_url === src || co.image_url2 === src);
-    if (colorsUsingThisImage.length > 0) {
-      return colorsUsingThisImage.every(co => co.isAvailable === false);
-    }
-    return false;
-  };
-
-  // Build one flat list: primary → all color images → extra gallery
-  const allImages: string[] = [
-    ...(product.image_url ? [product.image_url] : []),
-    ...safeColorOptions.flatMap(co => [
-      ...(co.image_url ? [co.image_url] : []),
-      ...(co.image_url2 ? [co.image_url2] : []),
-    ]),
-    ...gallery.map(g => g.image_url),
-  ];
-
-  // Map color id → index of its first image in allImages (for jumping on swatch click)
-  const colorImageIndex: Record<string, number> = {};
-  let imgIdx = product.image_url ? 1 : 0;
-  for (const co of safeColorOptions) {
-    if (co.image_url) { colorImageIndex[co.id] = imgIdx; imgIdx++; }
-    if (co.image_url2) imgIdx++;
-  }
-
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [isPaused,  setIsPaused]  = useState(false);
-  const [autoPlayStopped, setAutoPlayStopped] = useState(false);
-  const [isZoomed,  setIsZoomed]  = useState(false);
+  const [activeIdx, setActiveIdx] = useState(() => initialColor ? imageIndexForColor(initialColor) : 0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [autoPlayStopped, setAutoPlayStopped] = useState(Boolean(initialColor));
+  const [isZoomed, setIsZoomed] = useState(false);
   const imageWrapRef = useRef<HTMLDivElement>(null);
-  const activeImage  = allImages[activeIdx] ?? null;
+  const activeImage = allImages[activeIdx] ?? null;
+  const imageColors = getImageColors(activeImage, mainImage, safeColorOptions);
+  const imageSoldOut = isColorImageSoldOut(imageColors);
+  const availableColor = inStockBool ? safeColorOptions.find(color => color.isAvailable !== false) : undefined;
+  const currentColors = selectedColors.map(selection =>
+    safeColorOptions.find(color => color.id === selection?.id) ?? null
+  );
+  const selectedSoldOut = selectedColors.some((selection, index) =>
+    selection !== null && (currentColors[index] === null || currentColors[index]?.isAvailable === false)
+  );
+  const canPurchase = inStockBool && !selectedSoldOut;
+  const selectedColorNames = [...new Set(currentColors.flatMap(color => color ? [color.name] : []))];
+  const inCart = isInCart(product.id, currentColors[0]?.id);
+  const selectedStatus = currentColors.flatMap(color => color
+    ? [`${color.name} — ${t(inStockBool && color.isAvailable !== false ? 'product.inStock' : 'product.outOfStock')}`]
+    : []
+  ).join(' · ');
 
   // Auto-slideshow
   useEffect(() => {
@@ -197,25 +179,19 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   const handleThumbClick = (idx: number) => {
     setActiveIdx(idx);
     setAutoPlayStopped(true);
+  };
 
-    const clickedSrc = allImages[idx];
-    if (clickedSrc && safeColorOptions.length > 0) {
-      const matchedColor = safeColorOptions.find(
-        co => co.image_url === clickedSrc || co.image_url2 === clickedSrc
-      );
-      if (matchedColor && matchedColor.isAvailable !== false && selectedColors[0]?.id !== matchedColor.id) {
-        if (qty === 1) {
-          setSelectedColors([matchedColor]);
-          setLastSelectedColor(matchedColor);
-        }
-      }
-    }
+  const selectColor = (color: ColorOption, index = 0) => {
+    if (adding) return;
+    setSelectedColors(previous => previous.map((selection, slot) => slot === index ? color : selection));
+    handleThumbClick(imageIndexForColor(color));
   };
 
   const validateColors = (): boolean => {
+    if (!canPurchase) return false;
     if (safeColorOptions.length > 0) {
-      const hasMissingColor = selectedColors.some(c => c === null);
-      if (hasMissingColor || selectedColors.length === 0) {
+      if (currentColors.length !== (hasQuantityBreaks ? qty : 1)
+        || currentColors.some(color => !getPurchasableColor(safeColorOptions, color?.id))) {
         setToastMessage(t('product.chooseColorError'));
         setHasShake(true);
         setTimeout(() => setHasShake(false), 500);
@@ -226,12 +202,23 @@ export default function ProductDetail({ product, gallery, related }: Props) {
     return true;
   };
 
-  const handleAddToCart = () => {
-    if (!validateColors()) return;
+  const addSelectedColors = async () => {
+    if (adding || !validateColors()) return false;
+    const colors = Array.from({ length: qty }, (_, index) => currentColors[hasQuantityBreaks ? index : 0] ?? null);
+    setAdding(true);
+    const issue = await addItems(product, colors);
+    setAdding(false);
+    if (issue) {
+      setToastMessage(t(issue === 'network' ? 'product.checkStockError' : 'product.outOfStock'));
+      router.refresh();
+      return false;
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    selectedColors.forEach(color => {
-      addItem(product, color ?? undefined);
-    });
+    return true;
+  };
+
+  const handleAddToCart = async () => {
+    if (!await addSelectedColors()) return;
     fbEvent.addToCart({
       content_ids:  [String(product.id)],
       content_name: product.title ?? '',
@@ -249,13 +236,8 @@ export default function ProductDetail({ product, gallery, related }: Props) {
   };
 
   // Direct checkout: add to cart then jump straight to checkout form
-  const handleBuyNow = () => {
-    if (!validateColors()) return;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    selectedColors.forEach(color => {
-      addItem(product, color ?? undefined);
-    });
+  const handleBuyNow = async () => {
+    if (!await addSelectedColors()) return;
     fbEvent.addToCart({
       content_ids:  [String(product.id)],
       content_name: product.title ?? '',
@@ -349,7 +331,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                     priority
                     fetchPriority="high"
                   />
-                  {isImageOutOfStock(activeImage) && (
+                  {imageSoldOut && (
                     <div className={styles.outOfStockOverlay}>
                       {t('product.outOfStock')}
                     </div>
@@ -359,6 +341,19 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                 <div className={styles.placeholder}>NYVARA</div>
               )}
             </div>
+
+            {imageSoldOut && (
+              <div className={styles.imageStockMessage} aria-live="polite">
+                <span>{imageColors.length === 1
+                  ? `${t('product.photoColor')} ${imageColors[0].name} — ${t('product.unavailable')}`
+                  : t('product.outOfStock')}</span>
+                {availableColor && (
+                  <button type="button" onClick={() => selectColor(availableColor,
+                    Math.max(0, currentColors.findIndex(color => color?.isAvailable === false))
+                  )}>{t('product.viewColor')} {availableColor.name}</button>
+                )}
+              </div>
+            )}
 
             {/* Dots */}
             {allImages.length > 1 && (
@@ -378,15 +373,17 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             {allImages.length > 1 && (
               <div className={styles.thumbnails}>
                 {allImages.map((src, idx) => {
-                  const outOfStock = isImageOutOfStock(src);
+                  const outOfStock = isColorImageSoldOut(getImageColors(src, mainImage, safeColorOptions));
                   return (
                     <button
                       key={src + idx}
-                      className={`${styles.thumb} ${idx === activeIdx ? styles.thumbActive : ''} ${outOfStock ? styles.thumbOutOfStock : ''}`}
+                      className={`${styles.thumb} ${idx === activeIdx ? styles.thumbActive : ''}`}
                       onClick={() => handleThumbClick(idx)}
-                      aria-label={`Photo ${idx + 1}`}
+                      aria-label={`Photo ${idx + 1}${outOfStock ? ` — ${t('product.soldOutPhoto')}` : ''}`}
+                      aria-pressed={idx === activeIdx}
                     >
-                      <Image src={src} alt={`Vue ${idx + 1}`} fill className={styles.thumbImg} sizes="80px" loading="lazy" />
+                      <Image src={src} alt="" fill className={styles.thumbImg} sizes="80px" loading="lazy" />
+                      {outOfStock && <span className={styles.thumbStockLabel}>{t('product.soldOutPhoto')}</span>}
                     </button>
                   );
                 })}
@@ -394,7 +391,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             )}
 
             {/* Color Selector — Mobile Only */}
-            {qty === 1 && safeColorOptions.length > 0 && (
+            {(!hasQuantityBreaks || qty === 1) && safeColorOptions.length > 0 && (
               <div className={`${styles.colorSelector} ${styles.mobileColorSelector}`}>
                 <p className={styles.colorLabel} style={{ textAlign: 'center', marginBottom: '12px', fontSize: '15px' }}>{t('product.color')} <strong>{selectedColors[0]?.name || t('product.chooseColor')}</strong></p>
                 <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ justifyContent: 'center', position: 'relative' }}>
@@ -406,16 +403,9 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                   {safeColorOptions.map(co => (
                     <button
                       key={co.id}
-                      disabled={co.isAvailable === false}
+                      aria-label={`${co.name} — ${t(co.isAvailable === false ? 'product.outOfStock' : 'product.inStock')}`}
                       className={`${styles.colorCircle} ${selectedColors[0]?.id === co.id ? styles.colorCircleActive : ''} ${co.isAvailable === false ? styles.colorDisabled : ''}`}
-                      onClick={() => {
-                        if (selectedColors[0]?.id === co.id) return;
-                        const newColors = [co];
-                        setSelectedColors(newColors);
-                        setLastSelectedColor(co);
-                        setActiveIdx(colorImageIndex[co.id] ?? 0);
-                        setAutoPlayStopped(true);
-                      }}
+                      onClick={() => selectColor(co)}
                       style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)`, width: '36px', height: '36px' } : { background: co.hex1, width: '36px', height: '36px' }}
                       title={co.name}
                     />
@@ -470,9 +460,11 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             <hr className={styles.divider} />
 
             {/* Stock */}
-            <div className={inStockBool ? styles.inStock : styles.outOfStock}>
-              {inStockBool ? <><CheckCircle2 size={16} /> {t('product.inStock')}</> : (product.is_active === false ? t('product.unavailable') : t('product.outOfStock'))}
-            </div>
+            {(!inStockBool || safeColorOptions.length === 0) && (
+              <div className={inStockBool ? styles.inStock : styles.outOfStock}>
+                {inStockBool ? <><CheckCircle2 size={16} /> {t('product.inStock')}</> : t('product.outOfStock')}
+              </div>
+            )}
 
             {/* Feature bullets */}
             {featuresList.length > 0 && (
@@ -513,7 +505,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                     <div 
                       key={idx}
                       className={`${styles.qbreakItem} ${qty === qb.min_qty ? styles.qbreakActive : ''}`}
-                      onClick={() => setQty(qb.min_qty)}
+                      onClick={() => { if (!adding) setQty(qb.min_qty); }}
                     >
                       <div className={styles.qbreakRadio}>
                         <div className={styles.qbreakRadioInner} />
@@ -533,17 +525,11 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                                     <button
                                       key={co.id}
                                       type="button"
-                                      disabled={co.isAvailable === false}
+                                      aria-label={`${co.name} — ${t(co.isAvailable === false ? 'product.outOfStock' : 'product.inStock')}`}
                                       className={`${styles.colorCircleSmall} ${selectedColors[uIdx]?.id === co.id ? styles.colorCircleSmallActive : ''} ${co.isAvailable === false ? styles.colorDisabled : ''}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (selectedColors[uIdx]?.id === co.id) return;
-                                        const newColors = [...selectedColors];
-                                        newColors[uIdx] = co;
-                                        setSelectedColors(newColors);
-                                        setLastSelectedColor(co);
-                                        setActiveIdx(colorImageIndex[co.id] ?? 0);
-                                        setAutoPlayStopped(true);
+                                        selectColor(co, uIdx);
                                       }}
                                       style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)` } : { background: co.hex1 }}
                                       title={co.name}
@@ -563,7 +549,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             )}
 
             {/* Selection des couleurs après l'offre — Desktop Only */}
-            {qty === 1 && safeColorOptions.length > 0 && (
+            {(!hasQuantityBreaks || qty === 1) && safeColorOptions.length > 0 && (
               <div className={`${styles.colorSelector} ${styles.desktopColorSelector}`}>
                 <p className={styles.colorLabel}>{t('product.color')} <strong>{selectedColors[0]?.name || t('product.chooseColor')}</strong></p>
                 <div className={`${styles.colorList} ${hasShake ? styles.shake : ''}`} style={{ position: 'relative' }}>
@@ -575,16 +561,9 @@ export default function ProductDetail({ product, gallery, related }: Props) {
                   {safeColorOptions.map(co => (
                     <button
                       key={co.id}
-                      disabled={co.isAvailable === false}
+                      aria-label={`${co.name} — ${t(co.isAvailable === false ? 'product.outOfStock' : 'product.inStock')}`}
                       className={`${styles.colorCircle} ${selectedColors[0]?.id === co.id ? styles.colorCircleActive : ''} ${co.isAvailable === false ? styles.colorDisabled : ''}`}
-                      onClick={() => {
-                        if (selectedColors[0]?.id === co.id) return;
-                        const newColors = [co];
-                        setSelectedColors(newColors);
-                        setLastSelectedColor(co);
-                        setActiveIdx(colorImageIndex[co.id] ?? 0);
-                        setAutoPlayStopped(true);
-                      }}
+                      onClick={() => selectColor(co)}
                       style={co.hex2 ? { background: `linear-gradient(135deg, ${co.hex1} 50%, ${co.hex2} 50%)` } : { background: co.hex1 }}
                       title={co.name}
                     />
@@ -598,11 +577,11 @@ export default function ProductDetail({ product, gallery, related }: Props) {
               <div className={styles.qtyRow}>
                 <span className={styles.qtyLabel}>{t('product.qty')}</span>
                 <div className={styles.qtyControl}>
-                  <button className={styles.qtyBtn} onClick={() => setQty(q => Math.max(1, q - 1))}>
+                  <button className={styles.qtyBtn} disabled={adding} onClick={() => setQty(q => Math.max(1, q - 1))}>
                     <Minus size={14} />
                   </button>
                   <span className={styles.qtyValue}>{qty}</span>
-                  <button className={styles.qtyBtn} onClick={() => setQty(q => Math.min(product.stock ?? 99, q + 1))}>
+                  <button className={styles.qtyBtn} disabled={adding} onClick={() => setQty(q => product.allow_unlimited_stock ? q + 1 : Math.min(product.stock ?? 1, q + 1))}>
                     <Plus size={14} />
                   </button>
                 </div>
@@ -610,11 +589,16 @@ export default function ProductDetail({ product, gallery, related }: Props) {
             )}
 
             <div className={styles.actions}>
+              {selectedStatus && (
+                <p className={canPurchase ? styles.inStock : styles.outOfStock} aria-live="polite">
+                  {t('product.color')} {selectedStatus}
+                </p>
+              )}
               {/* Primary CTA — jump straight to checkout */}
               <button
                 className={styles.buyNowBtn}
                 onClick={handleBuyNow}
-                disabled={!inStockBool}
+                disabled={!canPurchase || adding}
               >
                 {selectedColors[0] && (
                   <div style={{
@@ -632,7 +616,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
               <button
                 className={`${styles.addBtn} ${inCart ? styles.addBtnIn : ''}`}
                 onClick={handleAddToCart}
-                disabled={!inStockBool}
+                disabled={!canPurchase || adding}
               >
                 {inCart ? t('product.addedToCart') : t('product.addToCart')}
               </button>
@@ -741,6 +725,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
         <div className={styles.mobileCta}>
           <div className={styles.mobilePriceBlock}>
             <span className={styles.mobilePriceLabel}>Prix</span>
+            {selectedColorNames.length > 0 && <span className={styles.mobileColorName}>{selectedColorNames.join(' · ')}</span>}
             {hasDiscount ? (
               <>
                 <span className={styles.mobilePriceVal}>{formatTND(discountedPrice)}</span>
@@ -753,7 +738,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
           <button
             className={styles.mobileBuyBtn}
             onClick={handleBuyNow}
-            disabled={!inStockBool}
+            disabled={!canPurchase || adding}
           >
             {selectedColors[0] && (
               <div style={{
@@ -764,7 +749,7 @@ export default function ProductDetail({ product, gallery, related }: Props) {
               }} />
             )}
             <ShoppingBag size={16} />
-            {inStockBool ? t('product.buyNow') : t('product.outOfStock')}
+            {canPurchase ? t('product.buyNow') : t('product.outOfStock')}
           </button>
         </div>
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { useWishlist } from '@/context/WishlistContext';
+import { useEffect, useState } from 'react';
+import type { Product } from '@/types';
 import ProductCard from '@/components/shop/ProductCard';
 import Button from '@/components/ui/Button';
 import { Heart } from 'lucide-react';
@@ -9,6 +11,26 @@ import styles from './wishlist.module.css';
 
 export default function WishlistPage() {
   const { items } = useWishlist();
+  const [liveProducts, setLiveProducts] = useState<Record<string, Product | null>>({});
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    const controller = new AbortController();
+    void Promise.all(items.map(async ({ id }) => {
+      try {
+        const response = await fetch(`/api/products/${id}`, { cache: 'no-store', signal: controller.signal });
+        if (response.status === 404) return [id, null] as const;
+        if (response.ok) return [id, (await response.json()).data as Product] as const;
+      } catch {
+        // The locally saved item remains available when a refresh fails.
+      }
+      return null;
+    })).then(results => {
+      if (controller.signal.aborted) return;
+      setLiveProducts(Object.fromEntries(results.filter(result => result !== null)));
+    });
+    return () => controller.abort();
+  }, [items]);
 
   return (
     <div className={styles.page}>
@@ -40,9 +62,10 @@ export default function WishlistPage() {
           </div>
         ) : (
           <div className={styles.grid}>
-            {items.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+            {items.map(product => {
+              const live = liveProducts[product.id];
+              return <ProductCard key={product.id} product={live ?? (live === null ? { ...product, is_active: false } : product)} />;
+            })}
           </div>
         )}
       </main>

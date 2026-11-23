@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { validatePurchase } from '@/lib/product-availability';
+import type { Product } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,29 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   } catch (err) {
     console.error('[GET /api/products/:id] Error:', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
+// Verify cart additions against current stock and colors before the browser saves them.
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const selections = await request.json();
+    if (!Array.isArray(selections) || selections.length === 0
+      || selections.some(selection => !selection || !Number.isSafeInteger(selection.quantity) || selection.quantity < 1)) {
+      return NextResponse.json({ error: 'Invalid cart quantities' }, { status: 400 });
+    }
+
+    const rows = await sql<Pick<Product, 'stock' | 'is_active' | 'allow_unlimited_stock' | 'color_options'>[]>`
+      SELECT stock, is_active, allow_unlimited_stock, color_options
+      FROM products WHERE id = ${id} LIMIT 1`;
+    const product = rows[0];
+    const issue = product ? validatePurchase(product, selections) : 'stock';
+    if (issue) return NextResponse.json({ issue }, { status: 409 });
+    return NextResponse.json({ data: product });
+  } catch (err) {
+    console.error('[POST /api/products/:id] Cart validation failed:', err);
+    return NextResponse.json({ error: 'Unable to verify availability' }, { status: 500 });
   }
 }
 

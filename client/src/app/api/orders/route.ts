@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { getProductColors, getPurchasableColor, getQuantityBreaks, validatePurchase } from '@/lib/product-availability';
+import type { CreateOrderPayload, Product } from '@/types';
+
+type OrderProduct = Pick<Product, 'id' | 'title' | 'price' | 'discount' | 'quantity_breaks' | 'stock'
+  | 'allow_unlimited_stock' | 'is_active' | 'color_options'>;
 
 export const dynamic = 'force-dynamic';
 
@@ -117,66 +122,93 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const payload = await request.json();
+    const payload: CreateOrderPayload & { is_admin_create?: boolean; total_price?: number } = await request.json();
     const { customer_name, customer_email, phone, city, postal_code, country, address, items, is_admin_create, total_price: providedTotal } = payload;
 
-    if (!items?.length && !is_admin_create) return NextResponse.json({ error: 'No items provided' }, { status: 400 });
+    if (!Array.isArray(items) || (!items.length && !is_admin_create)
+      || items.some(item => !item || typeof item.product_id !== 'string'
+        || !Number.isSafeInteger(item.quantity) || item.quantity < 1)) {
+      return NextResponse.json({ error: 'Articles ou quantités invalides.' }, { status: 400 });
+    }
 
-    let final_total_price = providedTotal || 0;
-    const itemPrices: any[] = [];
+    return await sql.begin(async transaction => {
+      let final_total_price = providedTotal || 0;
+      const itemPrices: { price: number }[] = [];
+      const productsById = new Map<string, OrderProduct>();
 
-    if (items?.length > 0) {
-      // 1. Validate + fetch product prices from DB (server-authoritative)
-      const productIds = [...new Set<string>(items.map((i: any) => i.product_id))];
-      const products = await sql`
-        SELECT id, price, discount, quantity_breaks, stock, allow_unlimited_stock
-        FROM products WHERE id = ANY(${productIds}::uuid[])`;
+      if (items?.length > 0) {
+        // 1. Validate + fetch product prices from DB (server-authoritative)
+        const productIds = [...new Set<string>(items.map(item => item.product_id))];
+        const products = await transaction<OrderProduct[]>`
+          SELECT id, title, price, discount, quantity_breaks, stock, allow_unlimited_stock, is_active, color_options
+          FROM products WHERE id = ANY(${productIds}::uuid[]) ORDER BY id FOR SHARE`;
 
-      // Map total quantity per product (for quantity breaks)
-      const productTotals: Record<string, number> = {};
-      items.forEach((i: any) => { productTotals[i.product_id] = (productTotals[i.product_id] || 0) + i.quantity; });
-
-      // Calculate per-item unit price
-      items.forEach((i: any) => {
-        const p = (products as any[]).find((pr: any) => pr.id === i.product_id);
-        if (!p) { itemPrices.push({ id: i.product_id, price: 0 }); return; }
-        const totalQty = productTotals[i.product_id];
-        const breaks = (p.quantity_breaks || []) as any[];
-        const applicableBreak = [...breaks]
-          .sort((a: any, b: any) => b.min_qty - a.min_qty)
-          .find((qb: any) => totalQty >= qb.min_qty);
-        if (applicableBreak) {
-          itemPrices.push({ id: i.product_id, price: applicableBreak.total_price / totalQty });
-          return;
+        for (const product of products) productsById.set(product.id, product);
+        for (const productId of productIds) {
+          const product = productsById.get(productId);
+          if (!product) {
+            return NextResponse.json({ error: 'Un article du panier est indisponible.' }, { status: 409 });
+          }
+          const selections = items.filter(item => item.product_id === productId).map(item => ({
+            quantity: item.quantity,
+            colorId: item.selected_color?.id,
+          }));
+          const issue = validatePurchase(product, selections);
+          if (issue) {
+            const message = issue === 'color' ? 'Coloris indisponible. Retirez cet article du panier et choisissez un coloris disponible.'
+              : 'Stock insuffisant. Modifiez la quantité ou retirez cet article du panier.';
+            return NextResponse.json({ error: `${product.title ?? 'Article'} — ${message}` }, { status: 409 });
+          }
         }
-        const hasDiscount = p.discount != null && p.discount > 0;
-        const finalPrice = hasDiscount ? Math.round((p.price ?? 0) * (1 - (p.discount || 0) / 100)) : (p.price ?? 0);
-        itemPrices.push({ id: i.product_id, price: finalPrice });
-      });
 
-      final_total_price = items.reduce((sum: number, item: any, idx: number) => sum + itemPrices[idx].price * item.quantity, 0);
-    }
+        // Map total quantity per product (for quantity breaks)
+        const productTotals: Record<string, number> = {};
+        items.forEach(i => { productTotals[i.product_id] = (productTotals[i.product_id] || 0) + i.quantity; });
 
-    // 2. Insert order
-    const orderRows = await sql`
-      INSERT INTO orders (customer_name, customer_email, phone, city, postal_code, country, address, total_price)
-      VALUES (${customer_name}, ${customer_email ?? null}, ${phone}, ${city}, ${postal_code ?? null}, ${country ?? 'Tunisie'}, ${address ?? null}, ${final_total_price})
-      RETURNING *`;
-    const order = orderRows[0] as any;
+        // Calculate per-item unit price
+        for (const i of items) {
+          const p = productsById.get(i.product_id);
+          if (!p) throw new Error('Order product missing after validation');
+          const totalQty = productTotals[i.product_id];
+          const breaks = getQuantityBreaks(p.quantity_breaks);
+          const applicableBreak = [...breaks]
+            .sort((a, b) => b.min_qty - a.min_qty)
+            .find(qb => totalQty >= qb.min_qty);
+          if (applicableBreak) {
+            itemPrices.push({ price: applicableBreak.total_price / totalQty });
+            continue;
+          }
+          const hasDiscount = p.discount != null && p.discount > 0;
+          const finalPrice = hasDiscount ? Math.round((p.price ?? 0) * (1 - (p.discount || 0) / 100)) : (p.price ?? 0);
+          itemPrices.push({ price: finalPrice });
+        }
 
-    // 3. Insert order items
-    if (items?.length > 0) {
-      for (let idx = 0; idx < items.length; idx++) {
-        const i = items[idx];
-        await sql`
-          INSERT INTO order_items (order_id, product_id, quantity, selected_color_name, selected_color_hex1, selected_color_hex2, quantity_break_price)
-          VALUES (${order.id}, ${i.product_id}, ${i.quantity},
-                  ${i.selected_color?.name ?? null}, ${i.selected_color?.hex1 ?? null}, ${i.selected_color?.hex2 ?? null},
-                  ${itemPrices[idx].price})`;
+        final_total_price = items.reduce((sum, item, idx) => sum + itemPrices[idx].price * item.quantity, 0);
       }
-    }
 
-    return NextResponse.json({ data: order }, { status: 201 });
+      // 2. Insert order
+      const orderRows = await transaction`
+        INSERT INTO orders (customer_name, customer_email, phone, city, postal_code, country, address, total_price)
+        VALUES (${customer_name}, ${customer_email ?? null}, ${phone}, ${city}, ${postal_code ?? null}, ${country ?? 'Tunisie'}, ${address ?? null}, ${final_total_price})
+        RETURNING *`;
+      const order = orderRows[0] as any;
+
+      // 3. Insert order items
+      if (items?.length > 0) {
+        for (let idx = 0; idx < items.length; idx++) {
+          const i = items[idx];
+          const product = productsById.get(i.product_id);
+          const color = getPurchasableColor(getProductColors(product?.color_options), i.selected_color?.id);
+          await transaction`
+            INSERT INTO order_items (order_id, product_id, quantity, selected_color_name, selected_color_hex1, selected_color_hex2, quantity_break_price)
+            VALUES (${order.id}, ${i.product_id}, ${i.quantity},
+                    ${color?.name ?? null}, ${color?.hex1 ?? null}, ${color?.hex2 ?? null},
+                    ${itemPrices[idx].price})`;
+        }
+      }
+
+      return NextResponse.json({ data: order }, { status: 201 });
+    });
   } catch (err) {
     console.error('[POST /api/orders] Error:', (err as any).message);
     return NextResponse.json({ error: (err as any).message }, { status: 500 });
